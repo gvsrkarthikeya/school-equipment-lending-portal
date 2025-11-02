@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
 const roles = ['student', 'staff', 'admin'];
 
@@ -6,50 +8,50 @@ function AuthPage() {
     const [isLogin, setIsLogin] = useState(true);
     const [loginData, setLoginData] = useState({ username: '', password: '' });
     const [signupData, setSignupData] = useState({ username: '', password: '', role: 'student' });
+    const navigate = useNavigate();
 
+    // Signup
+    const handleSignup = async (e) => {
+    e.preventDefault();
+    try {
+        const response = await axios.post('http://localhost:3001/api/signup', signupData);
 
-    // dummy users
-    React.useEffect(() => {
-        const users = localStorage.getItem('users');
-        if (!users) {
-            const dummyUsers = [
-                { username: 'student1', password: 'pass123', role: 'student' },
-                { username: 'staff1', password: 'pass123', role: 'staff' },
-                { username: 'admin1', password: 'pass123', role: 'admin' }
-            ];
-            localStorage.setItem('users', JSON.stringify(dummyUsers));
-        }
-    }, []);
-
-    // Temporarily get users from localStorage
-    const getUsers = () => {
-        const users = localStorage.getItem('users');
-        return users ? JSON.parse(users) : [];
-    };
-
-    // Signup handler
-    const handleSignup = (e) => {
-        e.preventDefault();
-        const users = getUsers();
-        if (users.find(u => u.username === signupData.username)) {
-            alert('Username already exists!');
-            return;
-        }
-        users.push(signupData);
-        localStorage.setItem('users', JSON.stringify(users));
-        alert('Signup successful! You can now login.');
-        setIsLogin(true);
-    };
-
-    // Login handler
-    const handleLogin = (e) => {
-        e.preventDefault();
-        const users = getUsers();
-        const user = users.find(u => u.username === loginData.username && u.password === loginData.password);
-        if (user) {
-            alert(`Logged in as ${user.role}`);
+        if (response.data.message === 'success') {
+            alert('Signup successful! You can now login.');
+            setIsLogin(true);
         } else {
-            alert('Invalid credentials!');
+            alert(response.data.message || 'Username already exists!');
+        }
+    } catch (err) {
+        if (err.response && err.response.data && err.response.data.message) {
+            alert(err.response.data.message);
+        } else {
+            alert('Unable to Signup, Please try again later.');
+        }
+    }
+};
+
+    // Login
+    const handleLogin = async (e) => {
+        e.preventDefault();
+        try {
+            const response = await axios.post('http://localhost:3001/api/login', loginData);
+            // Expecting { token, role } from server
+            const { token, role, message } = response.data;
+            if (token && role) {
+                localStorage.setItem('token', token); // Store token for future requests
+                if (role === 'student') navigate('/student');
+                else if (role === 'staff') navigate('/staff');
+                else if (role === 'admin') navigate('/admin');
+            } else {
+                alert(message || 'Invalid credentials!');
+            }
+        } catch (err) {
+            if (err.response && err.response.data && err.response.data.message) {
+                alert(err.response.data.message);
+            } else {
+                alert('Server error. Please try again later.');
+            }
         }
     };
 
