@@ -3,6 +3,13 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
+import axios from 'axios';
+
+// If a token exists from a previous session, set the default Authorization header
+const existingToken = localStorage.getItem('token');
+if (existingToken) {
+  axios.defaults.headers.common['Authorization'] = `Bearer ${existingToken}`;
+}
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
