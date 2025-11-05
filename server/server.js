@@ -79,8 +79,8 @@ app.post('/api/login', async (req, res) => {
         if (!user) {
             return res.status(401).json({ message: 'Invalid credentials!' });
         }
-        // Issue a JWT (simple, assignment-appropriate)
-        const token = jwt.sign({ username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
+    // Issue a JWT
+    const token = jwt.sign({ username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
         res.json({ token, role: user.role });
     } catch (error) {
         logger.error(`Login error: ${error.message}`);
