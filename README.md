@@ -1,5 +1,5 @@
 
-# School Equipment Lending Portal — SE ZG503 assignment
+# School Equipment Lending Portal
 
 Hi — this repo contains our Phase 1 manual implementation for the School Equipment Lending Portal assignment.
 It's a small full-stack demo (React frontend + Node/Express backend) that implements the core features required by the assignment.
