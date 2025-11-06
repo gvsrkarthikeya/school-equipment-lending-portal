@@ -56,8 +56,18 @@ function AuthPage() {
     };
 
     return (
-        <div style={{ maxWidth: 400, margin: '40px auto', padding: 20, border: '1px solid #ccc', borderRadius: 8 }}>
-            <h2>{isLogin ? 'Login' : 'Signup'}</h2>
+        <div style={{ 
+            maxWidth: 400, 
+            margin: '40px auto', 
+            padding: '30px', 
+            border: '1px solid #ddd', 
+            borderRadius: 8,
+            backgroundColor: 'white',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+        }}>
+            <h2 style={{ textAlign: 'center', marginBottom: '20px', color: '#333' }}>
+                {isLogin ? 'Login' : 'Signup'}
+            </h2>
             {isLogin ? (
                 <form onSubmit={handleLogin}>
                     <input
@@ -76,10 +86,16 @@ function AuthPage() {
                         required
                         style={{ width: '100%', marginBottom: 10 }}
                     />
-                    <button type="submit" style={{ width: '100%' }}>Login</button>
-                    <div style={{ marginTop: 10 }}>
-                        <span>Don't have an account? </span>
-                        <button type="button" onClick={() => setIsLogin(false)}>Signup</button>
+                    <button type="submit" style={{ width: '100%', padding: '12px' }}>Login</button>
+                    <div style={{ marginTop: 15, textAlign: 'center' }}>
+                        <span style={{ color: '#666' }}>Don't have an account? </span>
+                        <button 
+                            type="button" 
+                            onClick={() => setIsLogin(false)}
+                            style={{ background: 'transparent', color: '#4CAF50', padding: '5px 10px' }}
+                        >
+                            Signup
+                        </button>
                     </div>
                 </form>
             ) : (
@@ -109,10 +125,16 @@ function AuthPage() {
                             <option key={role} value={role}>{role}</option>
                         ))}
                     </select>
-                    <button type="submit" style={{ width: '100%' }}>Signup</button>
-                    <div style={{ marginTop: 10 }}>
-                        <span>Already have an account? </span>
-                        <button type="button" onClick={() => setIsLogin(true)}>Login</button>
+                    <button type="submit" style={{ width: '100%', padding: '12px' }}>Signup</button>
+                    <div style={{ marginTop: 15, textAlign: 'center' }}>
+                        <span style={{ color: '#666' }}>Already have an account? </span>
+                        <button 
+                            type="button" 
+                            onClick={() => setIsLogin(true)}
+                            style={{ background: 'transparent', color: '#4CAF50', padding: '5px 10px' }}
+                        >
+                            Login
+                        </button>
                     </div>
                 </form>
             )}
