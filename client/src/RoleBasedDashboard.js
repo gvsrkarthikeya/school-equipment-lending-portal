@@ -8,6 +8,9 @@ const API_URL = 'http://localhost:3001/api';
 function RoleBasedDashboard() {
     const [equipment, setEquipment] = useState([]);
     const [requests, setRequests] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [deleteItemId, setDeleteItemId] = useState(null);
     // For demo, hardcode current user
     const currentUser = 'student1';
     // Get unique categories from equipment
@@ -16,8 +19,18 @@ function RoleBasedDashboard() {
     const [role] = useState(location.state?.role || 'student');
     // Fetch equipment and requests on mount
     useEffect(() => {
-        axios.get(`${API_URL}/equipment`).then(res => setEquipment(res.data));
-        axios.get(`${API_URL}/requests`).then(res => setRequests(res.data));
+        setLoading(true);
+        Promise.all([
+            axios.get(`${API_URL}/equipment`),
+            axios.get(`${API_URL}/requests`)
+        ]).then(([equipRes, reqRes]) => {
+            setEquipment(equipRes.data);
+            setRequests(reqRes.data);
+            setLoading(false);
+        }).catch(err => {
+            console.error('Error loading data:', err);
+            setLoading(false);
+        });
     }, []);
     const [search, setSearch] = useState('');
     const [category, setCategory] = useState('');
@@ -68,8 +81,20 @@ function RoleBasedDashboard() {
 
     // Delete equipment (admin)
     const handleDelete = async (id) => {
-        await axios.delete(`${API_URL}/equipment/${id}`);
-        setEquipment(equipment.filter(eq => eq._id !== id));
+        setShowDeleteModal(false);
+        await axios.delete(`${API_URL}/equipment/${deleteItemId}`);
+        setEquipment(equipment.filter(eq => eq._id !== deleteItemId));
+        setDeleteItemId(null);
+    };
+
+    const openDeleteModal = (id) => {
+        setDeleteItemId(id);
+        setShowDeleteModal(true);
+    };
+
+    const closeDeleteModal = () => {
+        setShowDeleteModal(false);
+        setDeleteItemId(null);
     };
 
     // Request to borrow (student)
@@ -113,6 +138,104 @@ function RoleBasedDashboard() {
         delete axios.defaults.headers.common['Authorization'];
         navigate('/');
     };
+
+    // Loading Skeleton Component
+    const LoadingSkeleton = () => (
+        <div style={{ padding: '20px' }}>
+            <div style={{ 
+                height: '40px', 
+                background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)',
+                backgroundSize: '200% 100%',
+                animation: 'loading 1.5s infinite',
+                borderRadius: '4px',
+                marginBottom: '20px'
+            }}></div>
+            <div style={{ 
+                height: '200px', 
+                background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)',
+                backgroundSize: '200% 100%',
+                animation: 'loading 1.5s infinite',
+                borderRadius: '4px',
+                marginBottom: '20px'
+            }}></div>
+            <style>
+                {`
+                    @keyframes loading {
+                        0% { background-position: 200% 0; }
+                        100% { background-position: -200% 0; }
+                    }
+                `}
+            </style>
+        </div>
+    );
+
+    // Confirmation Modal Component
+    const ConfirmationModal = ({ show, onClose, onConfirm, itemName }) => {
+        if (!show) return null;
+        
+        return (
+            <div style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 1000
+            }}>
+                <div style={{
+                    backgroundColor: 'white',
+                    padding: '30px',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                    maxWidth: '400px',
+                    width: '90%'
+                }}>
+                    <h3 style={{ marginTop: 0, color: '#333' }}>Confirm Delete</h3>
+                    <p style={{ color: '#666', marginBottom: '20px' }}>
+                        Are you sure you want to delete "{itemName}"? This action cannot be undone.
+                    </p>
+                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                        <button 
+                            onClick={onClose}
+                            style={{
+                                padding: '10px 20px',
+                                border: '1px solid #ccc',
+                                borderRadius: '4px',
+                                backgroundColor: 'white',
+                                cursor: 'pointer',
+                                fontSize: '14px'
+                            }}
+                        >
+                            Cancel
+                        </button>
+                        <button 
+                            onClick={onConfirm}
+                            style={{
+                                padding: '10px 20px',
+                                border: 'none',
+                                borderRadius: '4px',
+                                backgroundColor: '#dc3545',
+                                color: 'white',
+                                cursor: 'pointer',
+                                fontSize: '14px'
+                            }}
+                        >
+                            Delete
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    if (loading) {
+        return <LoadingSkeleton />;
+    }
+
     return (
         <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -215,7 +338,7 @@ function RoleBasedDashboard() {
                                                 })()}
                                                 {role === 'admin' && <>
                                                     <button onClick={() => handleEditClick(eq)}>Edit</button>
-                                                    <button onClick={() => handleDelete(eq._id)}>Delete</button>
+                                                    <button onClick={() => openDeleteModal(eq._id)}>Delete</button>
                                                 </>}
                                             </td>
                                         )}
@@ -226,6 +349,15 @@ function RoleBasedDashboard() {
                     )}
                 </tbody>
             </table>
+            
+            {/* Delete Confirmation Modal */}
+            <ConfirmationModal 
+                show={showDeleteModal}
+                onClose={closeDeleteModal}
+                onConfirm={handleDelete}
+                itemName={equipment.find(eq => eq._id === deleteItemId)?.name || 'this item'}
+            />
+            
             <hr />
             {/* Show assigned items for student */}
             {role === 'student' && (
