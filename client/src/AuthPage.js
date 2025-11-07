@@ -8,11 +8,13 @@ function AuthPage() {
     const [isLogin, setIsLogin] = useState(true);
     const [loginData, setLoginData] = useState({ username: '', password: '' });
     const [signupData, setSignupData] = useState({ username: '', password: '', role: 'student' });
+    const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
     // Signup
     const handleSignup = async (e) => {
     e.preventDefault();
+    setLoading(true);
     try {
         const response = await axios.post('http://localhost:3001/api/signup', signupData);
 
@@ -28,21 +30,22 @@ function AuthPage() {
         } else {
             alert('Unable to Signup, Please try again later.');
         }
+    } finally {
+        setLoading(false);
     }
 };
 
     // Login
     const handleLogin = async (e) => {
         e.preventDefault();
+        setLoading(true);
         try {
             const response = await axios.post('http://localhost:3001/api/login', loginData);
             // Expecting { token, role } from server
             const { token, role, message } = response.data;
             if (token && role) {
                 localStorage.setItem('token', token); // Store token for future requests
-                if (role === 'student') navigate('/student');
-                else if (role === 'staff') navigate('/staff');
-                else if (role === 'admin') navigate('/admin');
+                navigate('/dashboard', { state: { role } });
             } else {
                 alert(message || 'Invalid credentials!');
             }
@@ -52,12 +55,24 @@ function AuthPage() {
             } else {
                 alert('Server error. Please try again later.');
             }
+        } finally {
+            setLoading(false);
         }
     };
 
     return (
-        <div style={{ maxWidth: 400, margin: '40px auto', padding: 20, border: '1px solid #ccc', borderRadius: 8 }}>
-            <h2>{isLogin ? 'Login' : 'Signup'}</h2>
+        <div style={{ 
+            maxWidth: 400, 
+            margin: '40px auto', 
+            padding: '30px', 
+            border: '1px solid #ddd', 
+            borderRadius: 8,
+            backgroundColor: 'white',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+        }}>
+            <h2 style={{ textAlign: 'center', marginBottom: '20px', color: '#333' }}>
+                {isLogin ? 'Login' : 'Signup'}
+            </h2>
             {isLogin ? (
                 <form onSubmit={handleLogin}>
                     <input
@@ -66,6 +81,7 @@ function AuthPage() {
                         value={loginData.username}
                         onChange={e => setLoginData({ ...loginData, username: e.target.value })}
                         required
+                        disabled={loading}
                         style={{ width: '100%', marginBottom: 10 }}
                     />
                     <input
@@ -74,12 +90,46 @@ function AuthPage() {
                         value={loginData.password}
                         onChange={e => setLoginData({ ...loginData, password: e.target.value })}
                         required
+                        disabled={loading}
                         style={{ width: '100%', marginBottom: 10 }}
                     />
-                    <button type="submit" style={{ width: '100%' }}>Login</button>
-                    <div style={{ marginTop: 10 }}>
-                        <span>Don't have an account? </span>
-                        <button type="button" onClick={() => setIsLogin(false)}>Signup</button>
+                    <button 
+                        type="submit" 
+                        disabled={loading}
+                        style={{ 
+                            width: '100%', 
+                            padding: '12px',
+                            position: 'relative',
+                            backgroundColor: loading ? '#ccc' : '',
+                            cursor: loading ? 'not-allowed' : 'pointer'
+                        }}
+                    >
+                        {loading ? (
+                            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <span style={{
+                                    display: 'inline-block',
+                                    width: '16px',
+                                    height: '16px',
+                                    border: '2px solid #fff',
+                                    borderTopColor: 'transparent',
+                                    borderRadius: '50%',
+                                    animation: 'spin 0.8s linear infinite',
+                                    marginRight: '8px'
+                                }}></span>
+                                Logging in...
+                            </span>
+                        ) : 'Login'}
+                    </button>
+                    <div style={{ marginTop: 15, textAlign: 'center' }}>
+                        <span style={{ color: '#666' }}>Don't have an account? </span>
+                        <button 
+                            type="button" 
+                            onClick={() => setIsLogin(false)}
+                            disabled={loading}
+                            style={{ background: 'transparent', color: '#4CAF50', padding: '5px 10px' }}
+                        >
+                            Signup
+                        </button>
                     </div>
                 </form>
             ) : (
@@ -90,6 +140,7 @@ function AuthPage() {
                         value={signupData.username}
                         onChange={e => setSignupData({ ...signupData, username: e.target.value })}
                         required
+                        disabled={loading}
                         style={{ width: '100%', marginBottom: 10 }}
                     />
                     <input
@@ -98,24 +149,65 @@ function AuthPage() {
                         value={signupData.password}
                         onChange={e => setSignupData({ ...signupData, password: e.target.value })}
                         required
+                        disabled={loading}
                         style={{ width: '100%', marginBottom: 10 }}
                     />
                     <select
                         value={signupData.role}
                         onChange={e => setSignupData({ ...signupData, role: e.target.value })}
+                        disabled={loading}
                         style={{ width: '100%', marginBottom: 10 }}
                     >
                         {roles.map(role => (
                             <option key={role} value={role}>{role}</option>
                         ))}
                     </select>
-                    <button type="submit" style={{ width: '100%' }}>Signup</button>
-                    <div style={{ marginTop: 10 }}>
-                        <span>Already have an account? </span>
-                        <button type="button" onClick={() => setIsLogin(true)}>Login</button>
+                    <button 
+                        type="submit" 
+                        disabled={loading}
+                        style={{ 
+                            width: '100%', 
+                            padding: '12px',
+                            backgroundColor: loading ? '#ccc' : '',
+                            cursor: loading ? 'not-allowed' : 'pointer'
+                        }}
+                    >
+                        {loading ? (
+                            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <span style={{
+                                    display: 'inline-block',
+                                    width: '16px',
+                                    height: '16px',
+                                    border: '2px solid #fff',
+                                    borderTopColor: 'transparent',
+                                    borderRadius: '50%',
+                                    animation: 'spin 0.8s linear infinite',
+                                    marginRight: '8px'
+                                }}></span>
+                                Signing up...
+                            </span>
+                        ) : 'Signup'}
+                    </button>
+                    <div style={{ marginTop: 15, textAlign: 'center' }}>
+                        <span style={{ color: '#666' }}>Already have an account? </span>
+                        <button 
+                            type="button" 
+                            onClick={() => setIsLogin(true)}
+                            disabled={loading}
+                            style={{ background: 'transparent', color: '#4CAF50', padding: '5px 10px' }}
+                        >
+                            Login
+                        </button>
                     </div>
                 </form>
             )}
+            <style>
+                {`
+                    @keyframes spin {
+                        to { transform: rotate(360deg); }
+                    }
+                `}
+            </style>
         </div>
     );
 }

@@ -1,18 +1,15 @@
 import React from 'react';
+import './App.css';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import AuthPage from './AuthPage';
-import StudentView from './StudentView';
-import StaffView from './StaffView';
-import AdminView from './AdminView';
+import RoleBasedDashboard from './RoleBasedDashboard';
 
 function App() {
   return (
     <Router>
       <Routes>
         <Route path="/" element={<AuthPage />} />
-        <Route path="/student" element={<StudentView />} />
-        <Route path="/staff" element={<StaffView />} />
-        <Route path="/admin" element={<AdminView />} />
+        <Route path="/dashboard" element={<RoleBasedDashboard />} />
       </Routes>
     </Router>
   );
