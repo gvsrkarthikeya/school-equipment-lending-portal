@@ -1,301 +1,284 @@
-// server.js
+// server.js - Phase 2: AI-Assisted Refactored Version
+// Enhancements: Security, validation, error handling, performance, authorization
+
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { MongoClient, ObjectId } = require('mongodb');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const compression = require('compression');
+const rateLimit = require('express-rate-limit');
+const { body, param, validationResult } = require('express-validator');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const app = express();
+const { MongoClient, ObjectId } = require('mongodb');
 const logger = require('./logger');
-const port = 3001; // Listen port for the backend API
 
-// JWT secret (use env var if provided; fallback for local dev only)
+// ENVIRONMENT
+const PORT = process.env.PORT || 3001;
+const MONGODB_URI = process.env.MONGODB_URI;
+const DB_NAME = process.env.DB_NAME || 'school-equipment-lending-portal';
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
+const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS || '10', 10);
+const NODE_ENV = process.env.NODE_ENV || 'development';
 
-// Express middleware
-app.use(cors());
-app.use(express.json());
+if (!MONGODB_URI) {
+    logger.error('FATAL: MONGODB_URI environment variable is not set');
+    process.exit(1);
+}
 
-// MongoDB connection URI and client setup
-const uri = "mongodb+srv://2024tm93271_db_user:comCCmPxYV1Hj6Gn@school-equipment-lendin.bx2rbqg.mongodb.net/?appName=school-equipment-lending-portal";
-const client = new MongoClient(uri);
+if (!JWT_SECRET || JWT_SECRET === 'dev-secret-change-me') {
+    if (NODE_ENV === 'production') {
+        logger.error('FATAL: JWT_SECRET must be changed in production');
+        process.exit(1);
+    }
+    logger.warn('Using default JWT_SECRET. Change this in production.');
+}
+
+const app = express();
+
+// Security / performance middlewares
+app.use(helmet());
+app.use(cors({ origin: NODE_ENV === 'production' ? process.env.ALLOWED_ORIGINS?.split(',') : '*' }));
+app.use(morgan(NODE_ENV === 'production' ? 'combined' : 'dev'));
+app.use(compression());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// rate limiters (relaxed for testing; tighten in production)
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 50, standardHeaders: true, legacyHeaders: false });
+const generalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 500, standardHeaders: true, legacyHeaders: false });
+app.use('/api/login', authLimiter);
+app.use('/api/signup', authLimiter);
+app.use('/api', generalLimiter);
+
+// DB
+const client = new MongoClient(MONGODB_URI, { maxPoolSize: 10, minPoolSize: 2, maxIdleTimeMS: 30000 });
+let db;
 let userCollection;
 let equipmentsCollection;
 let requestsCollection;
 
-// Connect to MongoDB and cache collection references.
-async function run() {
+async function createIndexes() {
     try {
-        logger.info('Attempting to connect to MongoDB...');
-        await client.connect();
-        const database = client.db("school-equipment-lending-portal");
-        userCollection = database.collection("users");
-        equipmentsCollection = database.collection("equipments");
-        requestsCollection = database.collection("requests");
-        logger.info('Connected to MongoDB and initialized collections: users, equipments, requests');
+        await userCollection.createIndex({ username: 1 }, { unique: true });
+        await equipmentsCollection.createIndex({ name: 1 });
+        await equipmentsCollection.createIndex({ category: 1 });
+        await equipmentsCollection.createIndex({ available: 1 });
+        await requestsCollection.createIndex({ user: 1 });
+        await requestsCollection.createIndex({ equipmentId: 1 });
+        await requestsCollection.createIndex({ status: 1 });
     } catch (err) {
-        logger.error(`MongoDB connection error: ${err && err.message}`);
-        throw err;
-    } finally {
-        // Keep connection open for the lifetime of the server. Do not close here.
+        logger.warn('Index creation warning: ' + err.message);
     }
 }
 
-// Static equipment data
-const staticEquipment = [
-    { _id: '1', name: 'Microscope', category: 'Science Lab', condition: 'Good', quantity: 5, available: 5 },
-    { _id: '2', name: 'Camera', category: 'Media', condition: 'Needs Repair', quantity: 2, available: 1 },
-    { _id: '3', name: 'Football', category: 'Sports', condition: 'Good', quantity: 10, available: 10 }
-];
-
-// Static requests data
-const staticRequests = [];
-
-/* API for getting equipment details */
-/**
- * GET /api/equipment
- * Returns list of equipment with `available` calculated as quantity minus
- * number of approved requests for that equipment.
- */
-app.get('/api/equipment', async (req, res) => {
-    logger.info('GET /api/equipment called');
+async function connectDB() {
     try {
-        const equipments = await equipmentsCollection.find({}).toArray();
-        logger.info(`Fetched ${equipments.length} equipment items`);
-        // Return stored availability values
-        res.json(equipments);
-    } catch (error) {
-        logger.error(`Error fetching equipment: ${error && error.message}`);
-        res.status(500).json({ message: 'Internal server error' });
+        logger.info('Connecting to MongoDB...');
+        await client.connect();
+        db = client.db(DB_NAME);
+        userCollection = db.collection('users');
+        equipmentsCollection = db.collection('equipments');
+        requestsCollection = db.collection('requests');
+        await createIndexes();
+        logger.info('Connected to MongoDB');
+    } catch (err) {
+        logger.error('MongoDB connection error: ' + err.message);
+        throw err;
     }
-});
+}
 
-/* API for adding new equipment */
-app.post('/api/equipment', async (req, res) => {
-    // Adds a new equipment document to the `equipments` collection.
-    const { name, category, condition, quantity, available } = req.body;
-    logger.info(`POST /api/equipment called - name=${name}`);
-    try {
-        const newEq = { name, category, condition, quantity, available };
-        const result = await equipmentsCollection.insertOne(newEq);
-        newEq._id = result.insertedId;
-        logger.info(`Equipment inserted with _id=${result.insertedId}`);
-        res.json(newEq);
-    } catch (error) {
-        logger.error(`Error adding equipment: ${error && error.message}`);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-
-
-/* API for getting all requests */
-app.get('/api/requests', async (req, res) => {
-    logger.info('GET /api/requests called');
-    try {
-        const requests = await requestsCollection.find({}).toArray();
-        logger.info(`Returning ${requests.length} requests`);
-        res.json(requests);
-    } catch (error) {
-        logger.error(`Error fetching requests: ${error && error.message}`);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-
-
-/* API for updating equipment details */
-app.put('/api/equipment/:id', async (req, res) => {
-    const { id } = req.params;
-    const { name, category, condition, quantity, available } = req.body;
-    logger.info(`PUT /api/equipment/${id} called`);
-    try {
-        const result = await equipmentsCollection.updateOne(
-            { _id: new ObjectId(id) },
-            { $set: { name, category, condition, quantity, available } }
-        );
-        if (result.matchedCount === 0) {
-            logger.info(`Equipment id=${id} not found`);
-            return res.status(404).json({ message: 'Equipment not found' });
-        }
-        logger.info(`Equipment id=${id} updated (modifiedCount=${result.modifiedCount})`);
-        res.json({ message: 'Equipment updated' });
-    } catch (error) {
-        logger.error(`Error updating equipment: ${error && error.message}`, error);
-        return res.status(500).json({ message: 'Internal server error' });
-    }
-
-});
-
-
-/* API for deleting equipment */
-app.delete('/api/equipment/:id', async (req, res) => {
-    const { id } = req.params;
-    logger.info(`DELETE /api/equipment/${id} called`);
-    try {
-        const result = await equipmentsCollection.deleteOne({ _id: new ObjectId(id) });
-        if (result.deletedCount === 0) {
-            logger.info(`Equipment id=${id} not found for delete`);
-            return res.status(404).json({ message: 'Equipment not found' });
-        }
-        logger.info(`Deleted equipment id=${id}`);
-        res.json({ message: 'Equipment deleted' });
-    } catch (error) {
-        logger.error(`Error deleting equipment: ${error && error.message}`, error);
-        return res.status(500).json({ message: 'Internal server error' });
-    }
-
-});
-
-
-// Requests Endpoints (STATIC ONLY)
-
-
-/* API for creating a new request */
-app.post('/api/requests', async (req, res) => {
-    const { equipmentId, user, status } = req.body;
-    logger.info(`POST /api/requests called by user=${user} for equipmentId=${equipmentId}`);
-    try {
-        const newReq = { equipmentId, user, status };
-        const result = await requestsCollection.insertOne(newReq);
-        newReq._id = result.insertedId;
-        logger.info(`Inserted request id=${result.insertedId}`);
-        res.json(newReq);
-    } catch (error) {
-        logger.error(`Error creating request: ${error && error.message}`, error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-
-
-/* API for updating request status (approve, reject, return) */
-app.put('/api/requests/:id', async (req, res) => {
-    const { id } = req.params;
-    const { status } = req.body;
-    logger.info(`PUT /api/requests/${id} -> status=${status}`);
-    try {
-        // Fetch existing request to understand previous status and target equipment
-        const existingReq = await requestsCollection.findOne({ _id: new ObjectId(id) });
-        if (!existingReq) {
-            logger.info(`Request id=${id} not found`);
-            return res.status(404).json({ message: 'Request not found' });
-        }
-
-        // Determine how availability should change
-        let delta = 0;
-        const prevStatus = existingReq.status;
-        if (prevStatus !== 'approved' && status === 'approved') {
-            // Moving into approved -> consume 1 availability
-            delta = -1;
-        } else if (prevStatus === 'approved' && status === 'returned') {
-            // Only returning releases availability; rejected should NOT change availability
-            delta = +1;
-        }
-
-        // Update equipment availability if needed
-        if (delta !== 0) {
-            const equipmentObjectId = new ObjectId(existingReq.equipmentId+'');
-            let eqUpdateResult;
-            if (delta < 0) {
-                // Ensure we don't go below zero availability
-                eqUpdateResult = await equipmentsCollection.updateOne(
-                    { _id: equipmentObjectId, available: { $gt: 0 } },
-                    { $inc: { available: -1 } }
-                );
-                if (eqUpdateResult.modifiedCount === 0) {
-                    logger.info(`No availability to approve for equipment=${existingReq.equipmentId}`);
-                    return res.status(400).json({ message: 'No availability for this equipment' });
-                }
-            } else {
-                // Increase availability (no hard cap enforced here)
-                eqUpdateResult = await equipmentsCollection.updateOne(
-                    { _id: equipmentObjectId },
-                    { $inc: { available: 1 } }
-                );
-            }
-            logger.info(`Adjusted equipment ${existingReq.equipmentId} availability by ${delta}`);
-        }
-
-        // Finally, update the request status
-        const result = await requestsCollection.updateOne(
-            { _id: new ObjectId(id) },
-            { $set: { status } }
-        );
-        logger.info(`Request id=${id} updated to status=${status} (modifiedCount=${result.modifiedCount})`);
-        res.json({ message: 'Request updated' });
-    } catch (error) {
-        logger.error(`Error updating request: ${error && error.message}`, error);
-        return res.status(500).json({ message: 'Internal server error' });
-    }
-
-});
-
-run().catch(console.dir);
-
-/* API for user signup */
-app.post('/api/signup', async (req, res) => {
-    const { username, password, role } = req.body;
-    logger.info(`Signup request: ${JSON.stringify(req.body)}`);
-    try {
-        // Check if user already exists in MongoDB
-        const existingUser = await userCollection.findOne({ username });
-        if (existingUser) {
-            return res.status(409).json({ message: 'Username already exists!' });
-        }
-
-        // Insert new user into MongoDB
-        await userCollection.insertOne({
-            username,
-            password,
-            role,
-            createdAt: new Date()
-        });
-
-        res.json({ message: 'success' });
-    } catch (error) {
-        logger.error(`Signup error: ${error.message}`, error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-
-// Login route
-/* API for user login */
-app.post('/api/login', async (req, res) => {
-    const { username, password } = req.body;
-    logger.info(`Login request: ${JSON.stringify(req.body)}`);
-    try {
-        const user = await userCollection.findOne({ username, password });
-        if (!user) {
-            return res.status(401).json({ message: 'Invalid credentials!' });
-        }
-        // Issue JWT with subject (user id), username and role, 1h expiry
-        const token = jwt.sign({ sub: user._id.toString(), username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
-    // Return token plus user object for immediate client-side use
-    // Also include top-level `role` for backward compatibility with existing clients
-    res.json({ token, role: user.role, user: { id: user._id.toString(), username: user.username, role: user.role } });
-    } catch (error) {
-        logger.error(`Login error: ${error.message}`, error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-
-// Simple auth middleware for protected routes
+// Auth middlewares
 function authenticate(req, res, next) {
     const auth = req.headers['authorization'];
-    if (!auth) return res.status(401).json({ message: 'No token provided' });
+    if (!auth) return res.status(401).json({ success: false, message: 'No token provided' });
     const parts = auth.split(' ');
-    if (parts.length !== 2 || parts[0] !== 'Bearer') return res.status(401).json({ message: 'Invalid authorization format' });
+    if (parts.length !== 2 || parts[0] !== 'Bearer') return res.status(401).json({ success: false, message: 'Invalid authorization format' });
     const token = parts[1];
     try {
         const payload = jwt.verify(token, JWT_SECRET);
         req.user = { id: payload.sub, username: payload.username, role: payload.role };
         next();
     } catch (err) {
-        return res.status(401).json({ message: 'Invalid or expired token' });
+        return res.status(401).json({ success: false, message: 'Invalid or expired token' });
     }
 }
 
-// Verify token and return user info
-app.get('/api/me', authenticate, (req, res) => {
-    res.json({ id: req.user.id, username: req.user.username, role: req.user.role });
+function authorize(...allowedRoles) {
+    return (req, res, next) => {
+        if (!req.user) return res.status(401).json({ success: false, message: 'Authentication required' });
+        if (!allowedRoles.includes(req.user.role)) return res.status(403).json({ success: false, message: 'Forbidden' });
+        next();
+    };
+}
+
+function handleValidationErrors(req, res, next) {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ success: false, message: 'Validation failed', errors: errors.array() });
+    }
+    next();
+}
+
+// Validation rules
+const validationRules = {
+    signup: [
+        body('username').trim().isLength({ min: 3, max: 30 }).matches(/^[a-zA-Z0-9_]+$/),
+        body('password').isLength({ min: 6 }),
+        body('role').isIn(['student', 'staff', 'admin'])
+    ],
+    login: [body('username').trim().notEmpty(), body('password').notEmpty()],
+    addEquipment: [body('name').notEmpty(), body('category').notEmpty(), body('condition').notEmpty(), body('quantity').isInt({ min: 1 })],
+    updateEquipment: [param('id').isMongoId()],
+    createRequest: [body('equipmentId').isMongoId(), body('user').notEmpty(), body('status').isIn(['pending','approved','rejected','returned'])],
+    updateRequest: [param('id').isMongoId(), body('status').isIn(['pending','approved','rejected','returned'])]
+};
+
+// Health and API info
+app.get('/health', (req, res) => {
+    const dbConnected = client.topology && client.topology.isConnected && typeof client.topology.isConnected === 'function' ? client.topology.isConnected() : true;
+    res.status(dbConnected ? 200 : 503).json({ success: dbConnected, uptime: process.uptime(), timestamp: Date.now() });
 });
 
-app.listen(port, () => {
-    console.log(`Backend server listening at http://localhost:${port}`);
+app.get('/api', (req, res) => res.json({ success: true, name: 'School Equipment Lending Portal API', phase: 'Phase 2' }));
+
+// AUTH
+app.post('/api/signup', validationRules.signup, handleValidationErrors, async (req, res, next) => {
+    try {
+        const { username, password, role } = req.body;
+        const existing = await userCollection.findOne({ username });
+        if (existing) return res.status(409).json({ success: false, message: 'Username exists' });
+        const hashed = await bcrypt.hash(password, BCRYPT_ROUNDS);
+        const result = await userCollection.insertOne({ username, password: hashed, role, createdAt: new Date(), updatedAt: new Date() });
+        res.status(201).json({ success: true, userId: result.insertedId.toString() });
+    } catch (err) { next(err); }
 });
+
+app.post('/api/login', validationRules.login, handleValidationErrors, async (req, res, next) => {
+    try {
+        const { username, password } = req.body;
+        const user = await userCollection.findOne({ username });
+        if (!user) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+        const ok = await bcrypt.compare(password, user.password);
+        if (!ok) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+        const token = jwt.sign({ sub: user._id.toString(), username: user.username, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+        res.json({ success: true, token, role: user.role, user: { id: user._id.toString(), username: user.username, role: user.role } });
+    } catch (err) { next(err); }
+});
+
+app.get('/api/me', authenticate, (req, res) => {
+    res.json({ success: true, user: req.user });
+});
+
+// EQUIPMENT
+app.get('/api/equipment', async (req, res, next) => {
+    try {
+        const { category, available, search } = req.query;
+        const q = {};
+        if (category) q.category = category;
+        if (available !== undefined) q.available = { $gte: parseInt(available, 10) };
+        if (search) q.$or = [{ name: { $regex: search, $options: 'i' } }, { category: { $regex: search, $options: 'i' } }];
+        const list = await equipmentsCollection.find(q).toArray();
+        res.json({ success: true, count: list.length, data: list });
+    } catch (err) { next(err); }
+});
+
+app.post('/api/equipment', authenticate, authorize('admin'), validationRules.addEquipment, handleValidationErrors, async (req, res, next) => {
+    try {
+        const { name, category, condition, quantity, available } = req.body;
+        const eq = { name, category, condition, quantity, available: available !== undefined ? available : quantity, createdBy: req.user.username, createdAt: new Date(), updatedAt: new Date() };
+        const result = await equipmentsCollection.insertOne(eq);
+        eq._id = result.insertedId;
+        res.status(201).json({ success: true, data: eq });
+    } catch (err) { next(err); }
+});
+
+app.put('/api/equipment/:id', authenticate, authorize('admin'), validationRules.updateEquipment, handleValidationErrors, async (req, res, next) => {
+    try {
+        const { id } = req.params; const updates = { updatedAt: new Date(), updatedBy: req.user.username };
+        const allowed = ['name','category','condition','quantity','available'];
+        allowed.forEach(k => { if (req.body[k] !== undefined) updates[k] = req.body[k]; });
+        const result = await equipmentsCollection.updateOne({ _id: new ObjectId(id) }, { $set: updates });
+        if (result.matchedCount === 0) return res.status(404).json({ success: false, message: 'Not found' });
+        res.json({ success: true, modifiedCount: result.modifiedCount });
+    } catch (err) { next(err); }
+});
+
+app.delete('/api/equipment/:id', authenticate, authorize('admin'), validationRules.updateEquipment, handleValidationErrors, async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const result = await equipmentsCollection.deleteOne({ _id: new ObjectId(id) });
+        if (result.deletedCount === 0) return res.status(404).json({ success: false, message: 'Not found' });
+        res.json({ success: true });
+    } catch (err) { next(err); }
+});
+
+// REQUESTS
+app.get('/api/requests', authenticate, async (req, res, next) => {
+    try {
+        const q = {};
+        if (req.user.role === 'student') q.user = req.user.username;
+        const list = await requestsCollection.find(q).toArray();
+        res.json({ success: true, count: list.length, data: list });
+    } catch (err) { next(err); }
+});
+
+app.post('/api/requests', authenticate, validationRules.createRequest, handleValidationErrors, async (req, res, next) => {
+    try {
+        const { equipmentId, user, status } = req.body;
+        const equipment = await equipmentsCollection.findOne({ _id: new ObjectId(equipmentId) });
+        if (!equipment) return res.status(404).json({ success: false, message: 'Equipment not found' });
+        if (equipment.available <= 0 && status === 'pending') return res.status(400).json({ success: false, message: 'No availability' });
+        const reqDoc = { equipmentId, user, status, createdAt: new Date(), updatedAt: new Date() };
+        const result = await requestsCollection.insertOne(reqDoc);
+        reqDoc._id = result.insertedId;
+        res.status(201).json({ success: true, data: reqDoc });
+    } catch (err) { next(err); }
+});
+
+app.put('/api/requests/:id', authenticate, authorize('staff','admin'), validationRules.updateRequest, handleValidationErrors, async (req, res, next) => {
+    try {
+        const { id } = req.params; const { status } = req.body;
+        const existing = await requestsCollection.findOne({ _id: new ObjectId(id) });
+        if (!existing) return res.status(404).json({ success: false, message: 'Not found' });
+        let delta = 0; if (existing.status !== 'approved' && status === 'approved') delta = -1; else if (existing.status === 'approved' && status === 'returned') delta = +1;
+        if (delta !== 0) {
+            const equipmentObjectId = new ObjectId(existing.equipmentId);
+            if (delta < 0) {
+                const eqUpdate = await equipmentsCollection.updateOne({ _id: equipmentObjectId, available: { $gt: 0 } }, { $inc: { available: -1 }, $set: { updatedAt: new Date() } });
+                if (eqUpdate.modifiedCount === 0) return res.status(400).json({ success: false, message: 'No availability' });
+            } else {
+                await equipmentsCollection.updateOne({ _id: equipmentObjectId }, { $inc: { available: 1 }, $set: { updatedAt: new Date() } });
+            }
+        }
+        const result = await requestsCollection.updateOne({ _id: new ObjectId(id) }, { $set: { status, updatedAt: new Date(), updatedBy: req.user.username } });
+        res.json({ success: true, modifiedCount: result.modifiedCount });
+    } catch (err) { next(err); }
+});
+
+// 404
+app.use((req, res) => res.status(404).json({ success: false, message: 'Route not found' }));
+
+// Error handler
+app.use((err, req, res, next) => {
+    logger.error(err && err.stack ? err.stack : String(err));
+    if (err.name === 'MongoServerError') return res.status(500).json({ success: false, message: 'Database error' });
+    res.status(err.status || 500).json({ success: false, message: err.message || 'Internal server error' });
+});
+
+// Graceful shutdown
+async function gracefulShutdown() {
+    try { await client.close(); logger.info('MongoDB closed'); process.exit(0); } catch (err) { logger.error(err); process.exit(1); }
+}
+process.on('SIGINT', gracefulShutdown); process.on('SIGTERM', gracefulShutdown);
+
+// Start
+connectDB().then(() => {
+    app.listen(PORT, () => {
+        logger.info(`Server started on http://localhost:${PORT}`);
+    });
+}).catch(err => { logger.error('Startup failed: ' + err.message); process.exit(1); });
+
+module.exports = app;
