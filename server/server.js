@@ -55,22 +55,9 @@ app.get('/api/equipment', async (req, res) => {
     logger.info('GET /api/equipment called');
     try {
         const equipments = await equipmentsCollection.find({}).toArray();
-        const requests = await requestsCollection.find({ status: 'approved' }).toArray();
-
-        // Map equipmentId -> number of approved requests
-        const approvedCountMap = requests.reduce((acc, r) => {
-            acc[r.equipmentId] = (acc[r.equipmentId] || 0) + 1;
-            return acc;
-        }, {});
-
-        const equipmentWithAvailable = equipments.map(eq => ({
-            ...eq,
-            // Ensure we use the MongoDB document _id string when looking up counts
-            available: eq.quantity - (approvedCountMap[eq._id ? eq._id.toString() : ''] || 0)
-        }));
-
-        logger.info(`Fetched ${equipmentWithAvailable.length} equipment items`);
-        res.json(equipmentWithAvailable);
+        logger.info(`Fetched ${equipments.length} equipment items`);
+        // Return stored availability values
+        res.json(equipments);
     } catch (error) {
         logger.error(`Error fetching equipment: ${error && error.message}`);
         res.status(500).json({ message: 'Internal server error' });
@@ -179,15 +166,54 @@ app.put('/api/requests/:id', async (req, res) => {
     const { status } = req.body;
     logger.info(`PUT /api/requests/${id} -> status=${status}`);
     try {
+        // Fetch existing request to understand previous status and target equipment
+        const existingReq = await requestsCollection.findOne({ _id: new ObjectId(id) });
+        if (!existingReq) {
+            logger.info(`Request id=${id} not found`);
+            return res.status(404).json({ message: 'Request not found' });
+        }
+
+        // Determine how availability should change
+        let delta = 0;
+        const prevStatus = existingReq.status;
+        if (prevStatus !== 'approved' && status === 'approved') {
+            // Moving into approved -> consume 1 availability
+            delta = -1;
+        } else if (prevStatus === 'approved' && status === 'returned') {
+            // Only returning releases availability; rejected should NOT change availability
+            delta = +1;
+        }
+
+        // Update equipment availability if needed
+        if (delta !== 0) {
+            const equipmentObjectId = new ObjectId(existingReq.equipmentId+'');
+            let eqUpdateResult;
+            if (delta < 0) {
+                // Ensure we don't go below zero availability
+                eqUpdateResult = await equipmentsCollection.updateOne(
+                    { _id: equipmentObjectId, available: { $gt: 0 } },
+                    { $inc: { available: -1 } }
+                );
+                if (eqUpdateResult.modifiedCount === 0) {
+                    logger.info(`No availability to approve for equipment=${existingReq.equipmentId}`);
+                    return res.status(400).json({ message: 'No availability for this equipment' });
+                }
+            } else {
+                // Increase availability (no hard cap enforced here)
+                eqUpdateResult = await equipmentsCollection.updateOne(
+                    { _id: equipmentObjectId },
+                    { $inc: { available: 1 } }
+                );
+            }
+            logger.info(`Adjusted equipment ${existingReq.equipmentId} availability by ${delta}`);
+        }
+
+        // Finally, update the request status
         const result = await requestsCollection.updateOne(
             { _id: new ObjectId(id) },
             { $set: { status } }
         );
-        if (result.matchedCount === 0) {
-            logger.info(`Request id=${id} not found`);
-            return res.status(404).json({ message: 'Request not found' });
-        }
-        logger.info(`Request id=${id} updated to status=${status}`);
+        logger.info(`Request id=${id} updated to status=${status} (modifiedCount=${result.modifiedCount})`);
         res.json({ message: 'Request updated' });
     } catch (error) {
         logger.error(`Error updating request: ${error && error.message}`, error);
