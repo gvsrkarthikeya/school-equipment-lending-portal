@@ -36,28 +36,18 @@ function AuthPage() {
         e.preventDefault();
         try {
             const response = await axios.post('http://localhost:3001/api/login', loginData);
-            // Expecting { token, role } from server
             const { token, role, message } = response.data;
             if (token && role) {
-                localStorage.setItem('token', token); // Store token for future requests
-<<<<<<< HEAD
-                // Set axios default Authorization header so subsequent requests include the JWT
+                localStorage.setItem('token', token);
                 axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-                if (role === 'student') navigate('/student');
+                if (role === 'admin') navigate('/admin');
                 else if (role === 'staff') navigate('/staff');
-                else if (role === 'admin') navigate('/admin');
-=======
-                navigate('/dashboard', { state: { role } });
->>>>>>> origin/main
+                else navigate('/student');
             } else {
                 alert(message || 'Invalid credentials!');
             }
         } catch (err) {
-            if (err.response && err.response.data && err.response.data.message) {
-                alert(err.response.data.message);
-            } else {
-                alert('Server error. Please try again later.');
-            }
+            alert(err?.response?.data?.message || 'Server error. Please try again later.');
         }
     };
 

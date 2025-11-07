@@ -1,8 +1,7 @@
 // server.js
 const express = require('express');
 const cors = require('cors');
-<<<<<<< HEAD
-const { MongoClient } = require('mongodb');
+const { MongoClient, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken');
 const app = express();
 const logger = require('./logger');
@@ -10,12 +9,6 @@ const port = 3001; // Or any other desired port
 
 // JWT secret - for development use env var, otherwise fallback to a dev secret
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
-=======
-const { MongoClient, ObjectId } = require('mongodb');
-const app = express();
-const logger = require('./logger');
-const port = 3001; // Listen port for the backend API
->>>>>>> origin/main
 
 // Express middleware
 app.use(cors());
@@ -235,7 +228,6 @@ app.put('/api/requests/:id', async (req, res) => {
 
 run().catch(console.dir);
 
-<<<<<<< HEAD
 // Simple JWT-based authenticate middleware
 function authenticate(req, res, next) {
     const auth = req.headers['authorization'];
@@ -251,10 +243,6 @@ function authenticate(req, res, next) {
         return res.status(401).json({ message: 'Invalid or expired token' });
     }
 }
-
-=======
-/* API for user signup */
->>>>>>> origin/main
 app.post('/api/signup', async (req, res) => {
     const { username, password, role } = req.body;
     logger.info(`Signup request: ${JSON.stringify(req.body)}`);
