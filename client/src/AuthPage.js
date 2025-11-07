@@ -39,7 +39,9 @@ function AuthPage() {
             // Expecting { token, role } from server
             const { token, role, message } = response.data;
             if (token && role) {
-                localStorage.setItem('token', token); // Store token for future requests
+                // Persist token and set default Authorization header for manual dev phase
+                localStorage.setItem('token', token);
+                axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
                 navigate('/dashboard', { state: { role } });
             } else {
                 alert(message || 'Invalid credentials!');

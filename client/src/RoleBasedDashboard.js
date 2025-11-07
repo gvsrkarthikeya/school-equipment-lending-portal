@@ -110,6 +110,7 @@ function RoleBasedDashboard() {
     const navigate = useNavigate();
     const handleLogout = () => {
         localStorage.removeItem('token');
+        delete axios.defaults.headers.common['Authorization'];
         navigate('/');
     };
     return (

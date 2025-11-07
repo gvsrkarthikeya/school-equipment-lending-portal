@@ -2,9 +2,13 @@
 const express = require('express');
 const cors = require('cors');
 const { MongoClient, ObjectId } = require('mongodb');
+const jwt = require('jsonwebtoken');
 const app = express();
 const logger = require('./logger');
 const port = 3001; // Listen port for the backend API
+
+// JWT secret (use env var if provided; fallback for local dev only)
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 
 // Express middleware
 app.use(cors());
@@ -260,13 +264,36 @@ app.post('/api/login', async (req, res) => {
         if (!user) {
             return res.status(401).json({ message: 'Invalid credentials!' });
         }
-        // Simulate token (for now, just a string)
-        const token = 'dummy-token';
-        res.json({ token, role: user.role });
+        // Issue JWT with subject (user id), username and role, 1h expiry
+        const token = jwt.sign({ sub: user._id.toString(), username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
+    // Return token plus user object for immediate client-side use
+    // Also include top-level `role` for backward compatibility with existing clients
+    res.json({ token, role: user.role, user: { id: user._id.toString(), username: user.username, role: user.role } });
     } catch (error) {
         logger.error(`Login error: ${error.message}`, error);
         res.status(500).json({ message: 'Internal server error' });
     }
+});
+
+// Simple auth middleware for protected routes
+function authenticate(req, res, next) {
+    const auth = req.headers['authorization'];
+    if (!auth) return res.status(401).json({ message: 'No token provided' });
+    const parts = auth.split(' ');
+    if (parts.length !== 2 || parts[0] !== 'Bearer') return res.status(401).json({ message: 'Invalid authorization format' });
+    const token = parts[1];
+    try {
+        const payload = jwt.verify(token, JWT_SECRET);
+        req.user = { id: payload.sub, username: payload.username, role: payload.role };
+        next();
+    } catch (err) {
+        return res.status(401).json({ message: 'Invalid or expired token' });
+    }
+}
+
+// Verify token and return user info
+app.get('/api/me', authenticate, (req, res) => {
+    res.json({ id: req.user.id, username: req.user.username, role: req.user.role });
 });
 
 app.listen(port, () => {
