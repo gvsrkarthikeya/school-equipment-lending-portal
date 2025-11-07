@@ -40,9 +40,7 @@ function AuthPage() {
             const { token, role, message } = response.data;
             if (token && role) {
                 localStorage.setItem('token', token); // Store token for future requests
-                if (role === 'student') navigate('/student');
-                else if (role === 'staff') navigate('/staff');
-                else if (role === 'admin') navigate('/admin');
+                navigate('/dashboard', { state: { role } });
             } else {
                 alert(message || 'Invalid credentials!');
             }
