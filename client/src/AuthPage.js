@@ -40,11 +40,15 @@ function AuthPage() {
             const { token, role, message } = response.data;
             if (token && role) {
                 localStorage.setItem('token', token); // Store token for future requests
+<<<<<<< HEAD
                 // Set axios default Authorization header so subsequent requests include the JWT
                 axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
                 if (role === 'student') navigate('/student');
                 else if (role === 'staff') navigate('/staff');
                 else if (role === 'admin') navigate('/admin');
+=======
+                navigate('/dashboard', { state: { role } });
+>>>>>>> origin/main
             } else {
                 alert(message || 'Invalid credentials!');
             }
