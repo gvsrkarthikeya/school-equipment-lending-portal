@@ -7,7 +7,6 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const compression = require('compression');
-const rateLimit = require('express-rate-limit');
 const { body, param, validationResult } = require('express-validator');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -46,12 +45,8 @@ app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// rate limiters (relaxed for testing; tighten in production)
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 50, standardHeaders: true, legacyHeaders: false });
-const generalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 500, standardHeaders: true, legacyHeaders: false });
-app.use('/api/login', authLimiter);
-app.use('/api/signup', authLimiter);
-app.use('/api', generalLimiter);
+// rate limiters removed during development to avoid unexpected 429s
+// Re-enable in production with: express-rate-limit
 
 // DB
 const client = new MongoClient(MONGODB_URI, { maxPoolSize: 10, minPoolSize: 2, maxIdleTimeMS: 30000 });
@@ -79,11 +74,11 @@ async function connectDB() {
         logger.info('Connecting to MongoDB...');
         await client.connect();
         db = client.db(DB_NAME);
-        userCollection = db.collection('users');
+        userCollection = db.collection('usersai');  // Phase 2 uses separate collection
         equipmentsCollection = db.collection('equipments');
         requestsCollection = db.collection('requests');
         await createIndexes();
-        logger.info('Connected to MongoDB');
+        logger.info('Connected to MongoDB (using usersai collection for Phase 2)');
     } catch (err) {
         logger.error('MongoDB connection error: ' + err.message);
         throw err;
@@ -269,10 +264,24 @@ app.use((err, req, res, next) => {
 });
 
 // Graceful shutdown
+// Note: During development we've seen unexpected process termination in some
+// environments. To avoid accidental exits while debugging, close the MongoDB
+// client but do NOT call process.exit() automatically here. If you want the
+// server to exit on SIGINT/SIGTERM in production, re-enable the handlers.
 async function gracefulShutdown() {
-    try { await client.close(); logger.info('MongoDB closed'); process.exit(0); } catch (err) { logger.error(err); process.exit(1); }
+    try {
+        await client.close();
+        logger.info('MongoDB closed (gracefulShutdown completed)');
+        // Intentionally NOT calling process.exit() here to prevent accidental
+        // termination of the Node process during development/test runs.
+    } catch (err) {
+        logger.error('Error during graceful shutdown: ' + (err && err.message ? err.message : String(err)));
+    }
 }
-process.on('SIGINT', gracefulShutdown); process.on('SIGTERM', gracefulShutdown);
+// Automatic signal handlers are commented out to avoid unexpected shutdowns
+// during development. Uncomment in production if desired.
+// process.on('SIGINT', gracefulShutdown);
+// process.on('SIGTERM', gracefulShutdown);
 
 // Start
 connectDB().then(() => {

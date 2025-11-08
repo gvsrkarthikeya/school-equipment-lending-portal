@@ -13,27 +13,28 @@ function AuthPage() {
 
     // Signup
     const handleSignup = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-        const response = await axios.post('http://localhost:3001/api/signup', signupData);
-
-        if (response.data.message === 'success') {
-            alert('Signup successful! You can now login.');
-            setIsLogin(true);
-        } else {
-            alert(response.data.message || 'Username already exists!');
+        e.preventDefault();
+        setLoading(true);
+        try {
+            const response = await axios.post('http://localhost:3001/api/signup', signupData);
+            const { success, message } = response.data || {};
+            if (success) {
+                alert('Signup successful! You can now login.');
+                setIsLogin(true);
+            } else {
+                // Show server message if provided, else a generic fallback
+                alert(message || 'Signup failed. Please try again.');
+            }
+        } catch (err) {
+            if (err.response && err.response.data && err.response.data.message) {
+                alert(err.response.data.message);
+            } else {
+                alert('Unable to Signup, Please try again later.');
+            }
+        } finally {
+            setLoading(false);
         }
-    } catch (err) {
-        if (err.response && err.response.data && err.response.data.message) {
-            alert(err.response.data.message);
-        } else {
-            alert('Unable to Signup, Please try again later.');
-        }
-    } finally {
-        setLoading(false);
-    }
-};
+    };
 
     // Login
     const handleLogin = async (e) => {

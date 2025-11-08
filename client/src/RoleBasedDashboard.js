@@ -11,12 +11,28 @@ function RoleBasedDashboard() {
     const [loading, setLoading] = useState(true);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [deleteItemId, setDeleteItemId] = useState(null);
-    // For demo, hardcode current user
-    const currentUser = 'student1';
+    const [currentUser, setCurrentUser] = useState('');
     // Get unique categories from equipment
     const categories = Array.from(new Set(equipment.map(eq => eq.category).filter(Boolean)));
     const location = useLocation();
     const [role] = useState(location.state?.role || 'student');
+    
+    // Fetch current user info from /api/me
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            axios.get(`${API_URL}/me`)
+                .then(res => {
+                    // Phase 2 API returns { success: true, user: { id, username, role } }
+                    const userData = res.data.user || res.data;
+                    setCurrentUser(userData.username);
+                })
+                .catch(err => {
+                    console.error('Error fetching user info:', err);
+                });
+        }
+    }, []);
+    
     // Fetch equipment and requests on mount
     useEffect(() => {
         setLoading(true);
@@ -24,8 +40,9 @@ function RoleBasedDashboard() {
             axios.get(`${API_URL}/equipment`),
             axios.get(`${API_URL}/requests`)
         ]).then(([equipRes, reqRes]) => {
-            setEquipment(equipRes.data);
-            setRequests(reqRes.data);
+            // Phase 2 API returns { success, data, count } format
+            setEquipment(equipRes.data.data || equipRes.data);
+            setRequests(reqRes.data.data || reqRes.data);
             setLoading(false);
         }).catch(err => {
             console.error('Error loading data:', err);
@@ -51,7 +68,8 @@ function RoleBasedDashboard() {
         e.preventDefault();
         const newEq = { ...formData, available: formData.quantity };
         const res = await axios.post(`${API_URL}/equipment`, newEq);
-        setEquipment([...equipment, res.data]);
+        // Phase 2 API returns { success, data }
+        setEquipment([...equipment, res.data.data || res.data]);
         setFormData({ name: '', category: '', condition: '', quantity: 1 });
         setShowForm(false);
     };
@@ -99,36 +117,52 @@ function RoleBasedDashboard() {
 
     // Request to borrow (student)
     const handleRequest = async (id) => {
-        const newReq = { equipmentId: id, user: 'student1', status: 'pending' };
+        const newReq = { equipmentId: id, user: currentUser, status: 'pending' };
         const res = await axios.post(`${API_URL}/requests`, newReq);
-        setRequests([...requests, res.data]);
+        // Phase 2 API returns { success, data }
+        setRequests([...requests, res.data.data || res.data]);
         alert('Request sent!');
     };
 
     // Approve/Reject request (staff/admin)
     const handleApprove = async (reqId) => {
-        await axios.put(`${API_URL}/requests/${reqId}`, { status: 'approved' });
-        setRequests(requests.map(r => r._id === reqId ? { ...r, status: 'approved' } : r));
-        // Decrement available
-        const req = requests.find(r => r._id === reqId);
-        setEquipment(equipment.map(eq => {
-            if (eq._id === req.equipmentId && eq.available > 0) {
-                return { ...eq, available: eq.available - 1 };
-            }
-            return eq;
-        }));
+        try {
+            const res = await axios.put(`${API_URL}/requests/${reqId}`, { status: 'approved' });
+            const updatedRequest = res.data.data || res.data;
+            setRequests(requests.map(r => r._id === reqId ? { ...r, status: 'approved' } : r));
+            // Decrement available
+            const req = requests.find(r => r._id === reqId);
+            setEquipment(equipment.map(eq => {
+                if (eq._id === req.equipmentId && eq.available > 0) {
+                    return { ...eq, available: eq.available - 1 };
+                }
+                return eq;
+            }));
+        } catch (err) {
+            alert(`Failed to approve request: ${err.response?.data?.message || err.message}`);
+        }
     };
     const handleReject = async (reqId) => {
-        await axios.put(`${API_URL}/requests/${reqId}`, { status: 'rejected' });
-        setRequests(requests.map(r => r._id === reqId ? { ...r, status: 'rejected' } : r));
+        try {
+            const res = await axios.put(`${API_URL}/requests/${reqId}`, { status: 'rejected' });
+            const updatedRequest = res.data.data || res.data;
+            setRequests(requests.map(r => r._id === reqId ? { ...r, status: 'rejected' } : r));
+        } catch (err) {
+            alert(`Failed to reject request: ${err.response?.data?.message || err.message}`);
+        }
     };
 
     // Mark as returned (staff/admin)
     const handleReturn = async (reqId) => {
-        await axios.put(`${API_URL}/requests/${reqId}`, { status: 'returned' });
-        const req = requests.find(r => r._id === reqId);
-        setEquipment(equipment.map(eq => eq._id === req.equipmentId ? { ...eq, available: eq.available + 1 } : eq));
-        setRequests(requests.map(r => r._id === reqId ? { ...r, status: 'returned' } : r));
+        try {
+            const res = await axios.put(`${API_URL}/requests/${reqId}`, { status: 'returned' });
+            const updatedRequest = res.data.data || res.data;
+            const req = requests.find(r => r._id === reqId);
+            setEquipment(equipment.map(eq => eq._id === req.equipmentId ? { ...eq, available: eq.available + 1 } : eq));
+            setRequests(requests.map(r => r._id === reqId ? { ...r, status: 'returned' } : r));
+        } catch (err) {
+            alert(`Failed to mark as returned: ${err.response?.data?.message || err.message}`);
+        }
     };
 
 
