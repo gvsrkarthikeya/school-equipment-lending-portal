@@ -8,8 +8,8 @@ const API_URL = 'http://localhost:3001/api';
 function RoleBasedDashboard() {
     const [equipment, setEquipment] = useState([]);
     const [requests, setRequests] = useState([]);
-    // For demo, hardcode current user
-    const currentUser = 'student1';
+    // Get current user from localStorage (set after login)
+    const currentUser = localStorage.getItem('username') || '';
     // Get unique categories from equipment
     const categories = Array.from(new Set(equipment.map(eq => eq.category).filter(Boolean)));
     const location = useLocation();
@@ -74,7 +74,7 @@ function RoleBasedDashboard() {
 
     // Request to borrow (student)
     const handleRequest = async (id) => {
-        const newReq = { equipmentId: id, user: 'student1', status: 'pending' };
+    const newReq = { equipmentId: id, user: currentUser, status: 'pending' };
         const res = await axios.post(`${API_URL}/requests`, newReq);
         setRequests([...requests, res.data]);
         alert('Request sent!');
@@ -265,6 +265,33 @@ function RoleBasedDashboard() {
             )}
             {(role === 'staff' || role === 'admin') && (
                 <div>
+                    {role === 'admin' && (
+                        <div style={{ marginBottom: '2em', background: '#f8f8f8', padding: '1em', borderRadius: '8px' }}>
+                            <h3>Usage Analytics</h3>
+                            <ul style={{ listStyle: 'none', padding: 0 }}>
+                                <li><b>Total Requests:</b> {requests.length}</li>
+                                <li><b>Pending:</b> {requests.filter(r => r.status === 'pending').length}</li>
+                                <li><b>Approved:</b> {requests.filter(r => r.status === 'approved').length}</li>
+                                <li><b>Rejected:</b> {requests.filter(r => r.status === 'rejected').length}</li>
+                                <li><b>Returned:</b> {requests.filter(r => r.status === 'returned').length}</li>
+                                <li><b>Most Requested Equipment:</b> {(() => {
+                                    if (requests.length === 0) return 'N/A';
+                                    const freq = {};
+                                    requests.forEach(r => { freq[r.equipmentId] = (freq[r.equipmentId] || 0) + 1; });
+                                    const maxId = Object.keys(freq).reduce((a, b) => freq[a] > freq[b] ? a : b);
+                                    const eq = equipment.find(eq => eq._id === maxId);
+                                    return eq ? `${eq.name} (${freq[maxId]} requests)` : 'N/A';
+                                })()}</li>
+                                <li><b>Top Requesting User:</b> {(() => {
+                                    if (requests.length === 0) return 'N/A';
+                                    const userFreq = {};
+                                    requests.forEach(r => { userFreq[r.user] = (userFreq[r.user] || 0) + 1; });
+                                    const maxUser = Object.keys(userFreq).reduce((a, b) => userFreq[a] > userFreq[b] ? a : b);
+                                    return `${maxUser} (${userFreq[maxUser]} requests)`;
+                                })()}</li>
+                            </ul>
+                        </div>
+                    )}
                     <h3>Borrow Requests</h3>
                     <table className="requests-table">
                         <thead>
