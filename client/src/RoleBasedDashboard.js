@@ -536,7 +536,7 @@ function RoleBasedDashboard() {
                                 ) : (
                                     studentAnalytics.map(row => (
                                         <tr key={`${row.user}-${row.equipmentId}`}>
-                                            <td>{row.user}</td>
+                                            <td>{row.user || '(unknown)'}</td>
                                             <td>{row.equipmentName}</td>
                                             <td>{row.category}</td>
                                             <td>{row.timesBorrowed}</td>
