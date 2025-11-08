@@ -14,7 +14,7 @@ This document covers: requirements mapping, backend & frontend architecture, dat
 | Dashboard & Search | React dashboard with search/filter by name/category, request actions, analytics panels |
 | Prevent Overlaps | Duplicate pending request check per (user,equipment) pair; availability checks |
 | Enhancement | Usage analytics (equipment borrow/return counters, lastBorrowedAt) + Student analytics (per-student borrow stats) |
-| Documentation | OpenAPI spec (`server/openapi.json`), this Architecture doc, forthcoming AI usage log & reflection |
+| Documentation | OpenAPI spec (`openapi.json`), this Architecture doc, forthcoming AI usage log & reflection |
 
 ## 3. Technology Stack
 ### Backend

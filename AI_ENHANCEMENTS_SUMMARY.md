@@ -1,6 +1,4 @@
-# [Moved] Phase 2: AI-Assisted Server Enhancements
-
-Note: This file was moved to repository root as `AI_ENHANCEMENTS_SUMMARY.md` for easier discovery.
+# Phase 2: AI-Assisted Server Enhancements
 
 ## AI Tool Used
 **Claude by Anthropic**
@@ -8,24 +6,35 @@ Note: This file was moved to repository root as `AI_ENHANCEMENTS_SUMMARY.md` for
 ## Enhancement Categories
 
 ### 1. **Security Enhancements** ✅
+### 1. **Security Enhancements** ✅
 - **Password Hashing**: Replaced plaintext passwords with bcrypt (10 rounds)
 - **Environment Variables**: Externalized secrets to `.env` file
 - **Security Headers**: Added helmet middleware for HTTP security headers
-- **Rate Limiting**: 
-  - Auth endpoints: 5 requests per 15 minutes
-  - General API: 100 requests per 15 minutes
+- **Rate Limiting (planned, disabled in dev)**:
+  - Planned: Auth endpoints 5 requests / 15 min; General API 100 / 15 min
+  - Disabled currently to avoid 429s during assignment evaluation
+  - Re-enable in production with `express-rate-limit`
 - **Input Validation**: express-validator for all endpoints
 - **Role-Based Authorization**: Middleware to protect admin/staff endpoints
-
-### 2. **Performance Optimizations** ⚡
-- **Database Indexing**: Created indexes on frequently queried fields
+- **Input Validation**: express-validator for all endpoints
+- **Role-Based Authorization**: Middleware to protect admin/staff endpoints
+### 2. **Rate Limiting**
+- Provides brute force & simple DoS mitigation
+- Currently NOT active (development profile)
+- Production: enable and tune via environment variables
 - **Connection Pooling**: Configured MongoDB connection pool (min: 2, max: 10)
-- **Response Compression**: gzip compression for all responses
+ [ ] Enable & review rate limit settings (currently disabled in dev)
 - **Query Optimization**: Added filtering parameters for equipment search
 
-### 3. **Code Quality Improvements** 📝
+Phase 2 AI-assisted development significantly improved:
+- ✅ Security posture (password hashing, validation, planned rate limiting)
 - **Structured Error Handling**: Centralized error middleware
 - **Request Logging**: Morgan logging (dev/combined modes)
+The refactored codebase is production-ready with industry-standard best practices.
+
+### Development vs Production Notes
+- Dev build: CORS allows all origins; rate limiting disabled; verbose logging.
+- Production recommendations: restrict CORS (`ALLOWED_ORIGINS`), enable rate limiting, rotate `JWT_SECRET`, raise `BCRYPT_ROUNDS` if acceptable latency.
 - **Validation Rules**: Comprehensive validation for all inputs
 - **Consistent Response Format**: `{ success, message, data }` pattern
 - **Graceful Shutdown**: Proper cleanup on SIGTERM/SIGINT
@@ -265,5 +274,3 @@ Phase 2 AI-assisted development significantly improved:
 - ✅ Developer experience (better logging, health checks)
 
 The refactored codebase is production-ready with industry-standard best practices.
-
-See root-level `AI_ENHANCEMENTS_SUMMARY.md` for the canonical version.

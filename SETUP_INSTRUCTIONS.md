@@ -1,22 +1,23 @@
-# [Moved] Setup Instructions
+# Setup Instructions (Phase 2)
 
-This file moved to repository root as `SETUP_INSTRUCTIONS.md`. Keeping a stub here for backward compatibility.
+Server enhanced (`server/server.js`) with security, validation, analytics. Rate limiting is disabled in dev to avoid 429 responses.
 
 ## Quick Setup Instructions
 
-1. **Backup current server.js** (already done: server.js.backup)
-
-2. **Replace server.js** with the enhanced version
-
-3. **Verify .env file** exists with correct credentials
-
-4. **Test the server:**
+1. Ensure `server.js.backup` exists (Phase1 snapshot).
+2. Confirm `.env` has valid MongoDB credentials.
+3. Install dependencies (first run):
+```bash
+cd server
+npm install
+```
+4. Start the server:
 ```bash
 cd server
 node server.js
 ```
 
-5. **Expected startup output:**
+5. Expected startup output:
 ```
 ===========================================
 Server Environment: development
@@ -51,4 +52,15 @@ curl -X POST http://localhost:3001/api/login \
   -d '{"username":"testuser","password":"password123"}'
 ```
 
-All enhancements documented in root `AI_ENHANCEMENTS_SUMMARY.md`
+Documentation:
+- Root `openapi.json` (API spec)
+- `API_REFERENCE.md` (quick endpoint guide)
+- `ARCHITECTURE.md` (design & flows)
+- `AI_ENHANCEMENTS_SUMMARY.md` (security/performance changes)
+
+Next (optional): run client app:
+```bash
+cd ../client
+npm install
+npm start
+```

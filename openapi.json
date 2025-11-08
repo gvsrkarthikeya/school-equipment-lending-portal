@@ -1,0 +1,303 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "School Equipment Lending Portal API",
+    "version": "2.0.0",
+    "description": "Phase 2 (AI-assisted) API for authentication, equipment management, request lifecycle, and analytics."
+  },
+  "servers": [
+    { "url": "http://localhost:3001", "description": "Local dev" }
+  ],
+  "tags": [
+    { "name": "System" },
+    { "name": "Auth" },
+    { "name": "Equipment" },
+    { "name": "Requests" },
+    { "name": "Analytics" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "ApiResponse": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "message": {"type": "string"},
+          "data": {"type": ["object", "array", "string", "null"]},
+          "count": {"type": "integer"}
+        },
+        "required": ["success"]
+      },
+      "UserPublic": {
+        "type": "object",
+        "properties": {
+          "id": {"type":"string"},
+          "username": {"type":"string"},
+          "role": {"type":"string", "enum":["student","staff","admin"]}
+        }
+      },
+      "SignupBody": {
+        "type": "object",
+        "required": ["username","password","role"],
+        "properties": {
+          "username": {"type": "string", "minLength": 3},
+          "password": {"type": "string", "minLength": 6},
+          "role": {"type": "string", "enum":["student","staff","admin"]}
+        }
+      },
+      "LoginBody": {
+        "type": "object",
+        "required": ["username","password"],
+        "properties": {
+          "username": {"type": "string"},
+          "password": {"type": "string"}
+        }
+      },
+      "Equipment": {
+        "type": "object",
+        "properties": {
+          "_id": {"type": "string"},
+          "name": {"type": "string"},
+          "category": {"type": "string"},
+          "condition": {"type": "string"},
+          "quantity": {"type": "integer", "minimum": 1},
+          "available": {"type": "integer", "minimum": 0},
+          "borrowCount": {"type": "integer", "minimum": 0},
+          "returnCount": {"type": "integer", "minimum": 0},
+          "lastBorrowedAt": {"type": ["string","null"], "format": "date-time"},
+          "createdBy": {"type": "string"},
+          "createdAt": {"type": "string", "format": "date-time"},
+          "updatedAt": {"type": "string", "format": "date-time"},
+          "updatedBy": {"type": "string"}
+        }
+      },
+      "EquipmentCreate": {
+        "type": "object",
+        "required": ["name","category","condition","quantity"],
+        "properties": {
+          "name": {"type": "string"},
+          "category": {"type": "string"},
+          "condition": {"type": "string"},
+          "quantity": {"type": "integer", "minimum": 1},
+          "available": {"type": "integer", "minimum": 0}
+        }
+      },
+      "EquipmentUpdate": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string"},
+          "category": {"type": "string"},
+          "condition": {"type": "string"},
+          "quantity": {"type": "integer", "minimum": 1},
+          "available": {"type": "integer", "minimum": 0}
+        }
+      },
+      "Request": {
+        "type": "object",
+        "properties": {
+          "_id": {"type": "string"},
+          "equipmentId": {"type": "string"},
+          "user": {"type": "string"},
+          "status": {"type": "string", "enum": ["pending","approved","rejected","returned"]},
+          "createdAt": {"type": "string", "format": "date-time"},
+          "updatedAt": {"type": "string", "format": "date-time"},
+          "updatedBy": {"type": "string"}
+        }
+      },
+      "RequestCreate": {
+        "type": "object",
+        "required": ["equipmentId","user","status"],
+        "properties": {
+          "equipmentId": {"type": "string"},
+          "user": {"type": "string"},
+          "status": {"type": "string", "enum": ["pending","approved","rejected","returned"]}
+        }
+      },
+      "RequestUpdate": {
+        "type": "object",
+        "required": ["status"],
+        "properties": {
+          "status": {"type": "string", "enum": ["pending","approved","rejected","returned"]}
+        }
+      }
+    }
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Health check",
+        "responses": {
+          "200": {"description": "OK", "content": {"application/json": {"schema": {"$ref":"#/components/schemas/ApiResponse"}}}},
+          "503": {"description": "Unavailable"}
+        }
+      }
+    },
+    "/api": {
+      "get": {
+        "tags": ["System"],
+        "summary": "API info",
+        "responses": {
+          "200": {"description": "Info", "content": {"application/json": {"schema": {"$ref":"#/components/schemas/ApiResponse"}}}}
+        }
+      }
+    },
+    "/api/signup": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Create account",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SignupBody"}}}},
+        "responses": {
+          "201": {"description": "Created", "content": {"application/json": {"schema": {"$ref":"#/components/schemas/ApiResponse"}}}},
+          "409": {"description": "Username exists"},
+          "400": {"description": "Validation error"}
+        }
+      }
+    },
+    "/api/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Login and get JWT",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LoginBody"}}}},
+        "responses": {
+          "200": {"description": "OK", "content": {"application/json": {"schema": {"$ref":"#/components/schemas/ApiResponse"}}}},
+          "401": {"description": "Invalid credentials"},
+          "400": {"description": "Validation error"}
+        }
+      }
+    },
+    "/api/me": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "Current user (requires JWT)",
+        "security": [{"bearerAuth": []}],
+        "responses": {
+          "200": {"description": "OK", "content": {"application/json": {"schema": {"$ref":"#/components/schemas/ApiResponse"}}}},
+          "401": {"description": "Unauthorized"}
+        }
+      }
+    },
+    "/api/equipment": {
+      "get": {
+        "tags": ["Equipment"],
+        "summary": "List equipment",
+        "parameters": [
+          {"name":"category","in":"query","schema":{"type":"string"}},
+          {"name":"available","in":"query","schema":{"type":"integer","minimum":0}},
+          {"name":"search","in":"query","schema":{"type":"string"}}
+        ],
+        "responses": {
+          "200": {"description": "List", "content": {"application/json": {"schema": {"$ref":"#/components/schemas/ApiResponse"}}}}
+        }
+      },
+      "post": {
+        "tags": ["Equipment"],
+        "summary": "Create equipment (admin)",
+        "security": [{"bearerAuth": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref":"#/components/schemas/EquipmentCreate"}}}},
+        "responses": {
+          "201": {"description": "Created", "content": {"application/json": {"schema": {"$ref":"#/components/schemas/ApiResponse"}}}},
+          "401": {"description": "Unauthorized"},
+          "403": {"description": "Forbidden"},
+          "400": {"description": "Validation error"}
+        }
+      }
+    },
+    "/api/equipment/{id}": {
+      "put": {
+        "tags": ["Equipment"],
+        "summary": "Update equipment (admin)",
+        "security": [{"bearerAuth": []}],
+        "parameters": [{"name":"id","in":"path","required":true,"schema":{"type":"string"}}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref":"#/components/schemas/EquipmentUpdate"}}}},
+        "responses": {
+          "200": {"description": "OK", "content": {"application/json": {"schema": {"$ref":"#/components/schemas/ApiResponse"}}}},
+          "404": {"description": "Not found"},
+          "401": {"description": "Unauthorized"},
+          "403": {"description": "Forbidden"}
+        }
+      },
+      "delete": {
+        "tags": ["Equipment"],
+        "summary": "Delete equipment (admin)",
+        "security": [{"bearerAuth": []}],
+        "parameters": [{"name":"id","in":"path","required":true,"schema":{"type":"string"}}],
+        "responses": {
+          "200": {"description": "Deleted", "content": {"application/json": {"schema": {"$ref":"#/components/schemas/ApiResponse"}}}},
+          "404": {"description": "Not found"},
+          "401": {"description": "Unauthorized"},
+          "403": {"description": "Forbidden"}
+        }
+      }
+    },
+    "/api/requests": {
+      "get": {
+        "tags": ["Requests"],
+        "summary": "List requests (students see their own)",
+        "security": [{"bearerAuth": []}],
+        "responses": {
+          "200": {"description": "List", "content": {"application/json": {"schema": {"$ref":"#/components/schemas/ApiResponse"}}}},
+          "401": {"description": "Unauthorized"}
+        }
+      },
+      "post": {
+        "tags": ["Requests"],
+        "summary": "Create request (student)",
+        "security": [{"bearerAuth": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref":"#/components/schemas/RequestCreate"}}}},
+        "responses": {
+          "201": {"description": "Created", "content": {"application/json": {"schema": {"$ref":"#/components/schemas/ApiResponse"}}}},
+          "400": {"description": "Validation / no availability"},
+          "401": {"description": "Unauthorized"},
+          "409": {"description": "Duplicate pending"}
+        }
+      }
+    },
+    "/api/requests/{id}": {
+      "put": {
+        "tags": ["Requests"],
+        "summary": "Update request status (staff/admin)",
+        "security": [{"bearerAuth": []}],
+        "parameters": [{"name":"id","in":"path","required":true,"schema":{"type":"string"}}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref":"#/components/schemas/RequestUpdate"}}}},
+        "responses": {
+          "200": {"description": "OK", "content": {"application/json": {"schema": {"$ref":"#/components/schemas/ApiResponse"}}}},
+          "400": {"description": "No availability / validation"},
+          "401": {"description": "Unauthorized"},
+          "403": {"description": "Forbidden"},
+          "404": {"description": "Not found"}
+        }
+      }
+    },
+    "/api/analytics/equipment": {
+      "get": {
+        "tags": ["Analytics"],
+        "summary": "Equipment usage analytics (staff/admin)",
+        "security": [{"bearerAuth": []}],
+        "responses": {
+          "200": {"description": "OK", "content": {"application/json": {"schema": {"$ref":"#/components/schemas/ApiResponse"}}}},
+          "401": {"description": "Unauthorized"},
+          "403": {"description": "Forbidden"}
+        }
+      }
+    },
+    "/api/analytics/students": {
+      "get": {
+        "tags": ["Analytics"],
+        "summary": "Student borrowing analytics (staff/admin)",
+        "security": [{"bearerAuth": []}],
+        "responses": {
+          "200": {"description": "OK", "content": {"application/json": {"schema": {"$ref":"#/components/schemas/ApiResponse"}}}},
+          "401": {"description": "Unauthorized"},
+          "403": {"description": "Forbidden"}
+        }
+      }
+    }
+  }
+}
