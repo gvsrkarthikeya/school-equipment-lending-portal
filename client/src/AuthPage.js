@@ -57,7 +57,8 @@ function AuthPage() {
 
     return (
         <div style={{ maxWidth: 400, margin: '40px auto', padding: 20, border: '1px solid #ccc', borderRadius: 8 }}>
-            <h2>{isLogin ? 'Login' : 'Signup'}</h2>
+            <h2 style={{ textAlign: 'center', color: '#4CAF50' }}>School Equipment Portal</h2>
+            <h3 style={{ textAlign: 'center' }}>{isLogin ? 'Login' : 'Signup'}</h3>
             {isLogin ? (
                 <form onSubmit={handleLogin}>
                     <input
