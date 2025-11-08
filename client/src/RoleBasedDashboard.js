@@ -168,6 +168,35 @@ function RoleBasedDashboard() {
         </div>
     );
 
+    // Status Badge Component
+    const StatusBadge = ({ status }) => {
+        const getStatusStyle = () => {
+            const baseStyle = {
+                display: 'inline-block',
+                padding: '4px 12px',
+                borderRadius: '12px',
+                fontSize: '12px',
+                fontWeight: '600',
+                textTransform: 'capitalize'
+            };
+
+            switch (status) {
+                case 'pending':
+                    return { ...baseStyle, backgroundColor: '#fff3cd', color: '#856404', border: '1px solid #ffeaa7' };
+                case 'approved':
+                    return { ...baseStyle, backgroundColor: '#d4edda', color: '#155724', border: '1px solid #c3e6cb' };
+                case 'rejected':
+                    return { ...baseStyle, backgroundColor: '#f8d7da', color: '#721c24', border: '1px solid #f5c6cb' };
+                case 'returned':
+                    return { ...baseStyle, backgroundColor: '#d1ecf1', color: '#0c5460', border: '1px solid #bee5eb' };
+                default:
+                    return { ...baseStyle, backgroundColor: '#e2e3e5', color: '#383d41', border: '1px solid #d6d8db' };
+            }
+        };
+
+        return <span style={getStatusStyle()}>{status}</span>;
+    };
+
     // Confirmation Modal Component
     const ConfirmationModal = ({ show, onClose, onConfirm, itemName }) => {
         if (!show) return null;
@@ -245,18 +274,20 @@ function RoleBasedDashboard() {
                             ? 'Staff Equipment Dashboard'
                             : 'Admin Equipment Dashboard'}
                 </h2>
-                <button onClick={handleLogout} style={{ marginLeft: 'auto' }}>Logout</button>
+                <button onClick={handleLogout} style={{ marginLeft: 'auto' }}>
+                    🚪 Logout
+                </button>
             </div>
             <hr />
             <div className="dashboard-controls">
-                <input placeholder="Search by name or category" value={search} onChange={e => setSearch(e.target.value)} />
+                <input placeholder="🔍 Search by name or category" value={search} onChange={e => setSearch(e.target.value)} />
                 <select value={category} onChange={e => setCategory(e.target.value)}>
                     <option value="">All Categories</option>
                     {categories.map(cat => (
                         <option key={cat} value={cat}>{cat}</option>
                     ))}
                 </select>
-                {role === 'admin' && <button onClick={() => setShowForm(!showForm)}>Add Equipment</button>}
+                {role === 'admin' && <button onClick={() => setShowForm(!showForm)}>➕ Add Equipment</button>}
             </div>
             {showForm && role === 'admin' && (
                 <form onSubmit={handleAdd}>
@@ -264,7 +295,7 @@ function RoleBasedDashboard() {
                     <input placeholder="Category" value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} required />
                     <input placeholder="Condition" value={formData.condition} onChange={e => setFormData({ ...formData, condition: e.target.value })} required />
                     <input type="number" min={1} placeholder="Quantity" value={formData.quantity} onChange={e => setFormData({ ...formData, quantity: Number(e.target.value) })} required />
-                    <button type="submit">Add</button>
+                    <button type="submit">✅ Add</button>
                 </form>
             )}
             <table className="equipment-table">
@@ -302,8 +333,8 @@ function RoleBasedDashboard() {
                                         <td>{editFormData.available}</td>
                                         {(role === 'student' || role === 'admin') && (
                                             <td>
-                                                <button className="edit-btn" type="button" onClick={handleEditSave}>Save</button>
-                                                <button className="edit-btn" type="button" onClick={handleEditCancel}>Cancel</button>
+                                                <button className="edit-btn" type="button" onClick={handleEditSave}>💾 Save</button>
+                                                <button className="edit-btn" type="button" onClick={handleEditCancel}>❌ Cancel</button>
                                             </td>
                                         )}
                                     </>
@@ -331,13 +362,13 @@ function RoleBasedDashboard() {
                                                             disabled={disabled}
                                                             style={style}
                                                         >
-                                                            Request
+                                                            📋 Request
                                                         </button>
                                                     );
                                                 })()}
                                                 {role === 'admin' && <>
-                                                    <button onClick={() => handleEditClick(eq)}>Edit</button>
-                                                    <button onClick={() => openDeleteModal(eq._id)}>Delete</button>
+                                                    <button onClick={() => handleEditClick(eq)}>✏️ Edit</button>
+                                                    <button onClick={() => openDeleteModal(eq._id)}>🗑️ Delete</button>
                                                 </>}
                                             </td>
                                         )}
@@ -385,7 +416,7 @@ function RoleBasedDashboard() {
                                             <td>{eq.name}</td>
                                             <td>{eq.category}</td>
                                             <td>{eq.condition}</td>
-                                            <td>{r.status}</td>
+                                            <td><StatusBadge status={r.status} /></td>
                                         </tr>
                                     );
                                 })
@@ -416,13 +447,13 @@ function RoleBasedDashboard() {
                                     <tr key={r._id}>
                                         <td>{equipment.find(eq => eq._id === r.equipmentId)?.name}</td>
                                         <td>{r.user}</td>
-                                        <td>{r.status}</td>
+                                        <td><StatusBadge status={r.status} /></td>
                                         <td>
                                             {r.status === 'pending' && <>
-                                                <button onClick={() => handleApprove(r._id)}>Approve</button>
-                                                <button onClick={() => handleReject(r._id)}>Reject</button>
+                                                <button onClick={() => handleApprove(r._id)}>✅ Approve</button>
+                                                <button onClick={() => handleReject(r._id)}>❌ Reject</button>
                                             </>}
-                                            {r.status === 'approved' && <button onClick={() => handleReturn(r._id)}>Mark as Returned</button>}
+                                            {r.status === 'approved' && <button onClick={() => handleReturn(r._id)}>↩️ Mark as Returned</button>}
                                         </td>
                                     </tr>
                                 ))
