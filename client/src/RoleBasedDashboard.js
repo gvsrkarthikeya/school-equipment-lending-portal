@@ -66,12 +66,16 @@ function RoleBasedDashboard() {
     // Add equipment
     const handleAdd = async (e) => {
         e.preventDefault();
-        const newEq = { ...formData, available: formData.quantity };
-        const res = await axios.post(`${API_URL}/equipment`, newEq);
-        // Phase 2 API returns { success, data }
-        setEquipment([...equipment, res.data.data || res.data]);
-        setFormData({ name: '', category: '', condition: '', quantity: 1 });
-        setShowForm(false);
+        try {
+            const newEq = { ...formData, available: formData.quantity };
+            const res = await axios.post(`${API_URL}/equipment`, newEq);
+            // Phase 2 API returns { success, data }
+            setEquipment([...equipment, res.data.data || res.data]);
+            setFormData({ name: '', category: '', condition: '', quantity: 1 });
+            setShowForm(false);
+        } catch (err) {
+            alert(`Failed to add equipment: ${err.response?.data?.message || err.message}`);
+        }
     };
 
     // Edit equipment (admin)
@@ -88,9 +92,13 @@ function RoleBasedDashboard() {
 
     const handleEditSave = async (e) => {
         e.preventDefault();
-        await axios.put(`${API_URL}/equipment/${editId}`, editFormData);
-        setEquipment(equipment.map(eq => eq._id === editId ? { ...eq, ...editFormData } : eq));
-        setEditId(null);
+        try {
+            await axios.put(`${API_URL}/equipment/${editId}`, editFormData);
+            setEquipment(equipment.map(eq => eq._id === editId ? { ...eq, ...editFormData } : eq));
+            setEditId(null);
+        } catch (err) {
+            alert(`Failed to update equipment: ${err.response?.data?.message || err.message}`);
+        }
     };
 
     const handleEditCancel = () => {
@@ -99,10 +107,15 @@ function RoleBasedDashboard() {
 
     // Delete equipment (admin)
     const handleDelete = async (id) => {
-        setShowDeleteModal(false);
-        await axios.delete(`${API_URL}/equipment/${deleteItemId}`);
-        setEquipment(equipment.filter(eq => eq._id !== deleteItemId));
-        setDeleteItemId(null);
+        try {
+            setShowDeleteModal(false);
+            await axios.delete(`${API_URL}/equipment/${deleteItemId}`);
+            setEquipment(equipment.filter(eq => eq._id !== deleteItemId));
+            setDeleteItemId(null);
+        } catch (err) {
+            alert(`Failed to delete equipment: ${err.response?.data?.message || err.message}`);
+            setDeleteItemId(null);
+        }
     };
 
     const openDeleteModal = (id) => {
@@ -117,11 +130,15 @@ function RoleBasedDashboard() {
 
     // Request to borrow (student)
     const handleRequest = async (id) => {
-        const newReq = { equipmentId: id, user: currentUser, status: 'pending' };
-        const res = await axios.post(`${API_URL}/requests`, newReq);
-        // Phase 2 API returns { success, data }
-        setRequests([...requests, res.data.data || res.data]);
-        alert('Request sent!');
+        try {
+            const newReq = { equipmentId: id, user: currentUser, status: 'pending' };
+            const res = await axios.post(`${API_URL}/requests`, newReq);
+            // Phase 2 API returns { success, data }
+            setRequests([...requests, res.data.data || res.data]);
+            alert('Request sent!');
+        } catch (err) {
+            alert(`Failed to send request: ${err.response?.data?.message || err.message}`);
+        }
     };
 
     // Approve/Reject request (staff/admin)
