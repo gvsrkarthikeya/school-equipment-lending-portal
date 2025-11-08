@@ -36,6 +36,23 @@ function RoleBasedDashboard() {
     // Add equipment
     const handleAdd = async (e) => {
         e.preventDefault();
+        // Validate all fields (no empty or whitespace-only values)
+        const trimmedName = formData.name.trim();
+        const trimmedCategory = formData.category.trim();
+        const trimmedCondition = formData.condition.trim();
+        const validQuantity = Number(formData.quantity) > 0;
+        if (!trimmedName || !trimmedCategory || !trimmedCondition || !validQuantity) {
+            alert('All fields are required and must not be empty or spaces only. Quantity must be at least 1.');
+            setFormData({ name: '', category: '', condition: '', quantity: 1 });
+            return;
+        }
+        // Check if equipment name already exists (case-insensitive)
+        const exists = equipment.some(eq => eq.name.trim().toLowerCase() === trimmedName.toLowerCase());
+        if (exists) {
+            alert('Equipment already exist');
+            setFormData({ name: '', category: '', condition: '', quantity: 1 });
+            return;
+        }
         const newEq = { ...formData, available: formData.quantity };
         const res = await axios.post(`${API_URL}/equipment`, newEq);
         setEquipment([...equipment, res.data]);
