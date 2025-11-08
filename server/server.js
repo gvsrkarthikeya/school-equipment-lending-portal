@@ -195,6 +195,21 @@ app.put('/api/equipment/:id', authenticate, authorize('admin'), validationRules.
         const { id } = req.params; const updates = { updatedAt: new Date(), updatedBy: req.user.username };
         const allowed = ['name','category','condition','quantity','available'];
         allowed.forEach(k => { if (req.body[k] !== undefined) updates[k] = req.body[k]; });
+        
+        // Enforce invariant: available <= quantity
+        // If quantity is being reduced, cap available to not exceed new quantity
+        if (updates.quantity !== undefined) {
+            const existing = await equipmentsCollection.findOne({ _id: new ObjectId(id) });
+            if (!existing) return res.status(404).json({ success: false, message: 'Not found' });
+            
+            // If new quantity is less than current available, cap available
+            const newQuantity = updates.quantity;
+            const currentAvailable = updates.available !== undefined ? updates.available : existing.available;
+            if (currentAvailable > newQuantity) {
+                updates.available = newQuantity;
+            }
+        }
+        
         const result = await equipmentsCollection.updateOne({ _id: new ObjectId(id) }, { $set: updates });
         if (result.matchedCount === 0) return res.status(404).json({ success: false, message: 'Not found' });
         res.json({ success: true, modifiedCount: result.modifiedCount });
@@ -226,6 +241,15 @@ app.post('/api/requests', authenticate, validationRules.createRequest, handleVal
         const equipment = await equipmentsCollection.findOne({ _id: new ObjectId(equipmentId) });
         if (!equipment) return res.status(404).json({ success: false, message: 'Equipment not found' });
         if (equipment.available <= 0 && status === 'pending') return res.status(400).json({ success: false, message: 'No availability' });
+        
+        // Prevent duplicate pending requests for the same user and equipment
+        const existingPending = await requestsCollection.findOne({ 
+            equipmentId, 
+            user, 
+            status: 'pending' 
+        });
+        if (existingPending) return res.status(409).json({ success: false, message: 'Request already pending for this equipment' });
+        
         const reqDoc = { equipmentId, user, status, createdAt: new Date(), updatedAt: new Date() };
         const result = await requestsCollection.insertOne(reqDoc);
         reqDoc._id = result.insertedId;
