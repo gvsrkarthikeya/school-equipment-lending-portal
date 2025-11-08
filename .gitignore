@@ -10,7 +10,7 @@ package-lock.json
 /server/dist
 
 # Environment variables
-.env
+# .env - temporarily allowing for assignment submission
 .env.local
 .env.development.local
 .env.test.local
