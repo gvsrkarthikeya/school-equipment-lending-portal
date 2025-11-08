@@ -1,0 +1,143 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "School Equipment Lending Portal - Manual API",
+    "version": "1.0.0",
+    "description": "OpenAPI spec for the manual development branch (simplified, minimal responses)."
+  },
+  "servers": [ { "url": "http://localhost:3001" } ],
+  "paths": {
+    "/api/signup": {
+      "post": {
+        "summary": "Create user (plaintext password)",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "properties": {"username": {"type": "string"}, "password": {"type": "string"}, "role": {"type": "string"}}}}}},
+        "responses": {
+          "200": {"description": "Signup success", "content": {"application/json": {"schema": {"type": "object", "properties": {"message": {"type": "string"}}}}}},
+          "409": {"description": "Username exists"}
+        }
+      }
+    },
+    "/api/login": {
+      "post": {
+        "summary": "Login and get JWT",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "properties": {"username": {"type": "string"}, "password": {"type": "string"}}}}}},
+        "responses": {
+          "200": {"description": "Login success", "content": {"application/json": {"schema": {"type": "object", "properties": {"token": {"type": "string"}, "role": {"type": "string"}, "user": {"type": "object", "properties": {"id": {"type": "string"}, "username": {"type": "string"}, "role": {"type": "string"}}}}}}}},
+          "401": {"description": "Invalid credentials"}
+        }
+      }
+    },
+    "/api/me": {
+      "get": {
+        "summary": "Get current user (requires Authorization header)",
+        "responses": {
+          "200": {"description": "User info", "content": {"application/json": {"schema": {"type": "object", "properties": {"id": {"type": "string"}, "username": {"type": "string"}, "role": {"type": "string"}}}}}},
+          "401": {"description": "Unauthorized"}
+        }
+      }
+    },
+    "/api/equipment": {
+      "get": {
+        "summary": "List equipment",
+        "responses": {
+          "200": {"description": "List of equipment", "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/Equipment"}}}}}
+        }
+      },
+      "post": {
+        "summary": "Add equipment (no auth enforced in manual version)",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/EquipmentCreate"}}}},
+        "responses": {
+          "200": {"description": "Created equipment", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Equipment"}}}}
+        }
+      }
+    },
+    "/api/equipment/{id}": {
+      "put": {
+        "summary": "Update equipment",
+        "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string"}}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/EquipmentCreate"}}}},
+        "responses": {
+          "200": {"description": "Updated", "content": {"application/json": {"schema": {"type": "object", "properties": {"message": {"type": "string"}}}}}},
+          "404": {"description": "Not found"}
+        }
+      },
+      "delete": {
+        "summary": "Delete equipment",
+        "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string"}}],
+        "responses": {
+          "200": {"description": "Deleted", "content": {"application/json": {"schema": {"type": "object", "properties": {"message": {"type": "string"}}}}}},
+          "404": {"description": "Not found"}
+        }
+      }
+    },
+    "/api/requests": {
+      "get": {
+        "summary": "List all requests (no user scoping)",
+        "responses": {
+          "200": {"description": "List of requests", "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/Request"}}}}}
+        }
+      },
+      "post": {
+        "summary": "Create request",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RequestCreate"}}}},
+        "responses": {
+          "200": {"description": "Created request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Request"}}}}
+        }
+      }
+    },
+    "/api/requests/{id}": {
+      "put": {
+        "summary": "Update request status (affects availability)",
+        "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string"}}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "properties": {"status": {"type": "string"}}}}}},
+        "responses": {
+          "200": {"description": "Updated request", "content": {"application/json": {"schema": {"type": "object", "properties": {"message": {"type": "string"}}}}}},
+          "400": {"description": "No availability"},
+          "404": {"description": "Not found"}
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Equipment": {
+        "type": "object",
+        "properties": {
+          "_id": {"type": "string"},
+          "name": {"type": "string"},
+          "category": {"type": "string"},
+          "condition": {"type": "string"},
+          "quantity": {"type": "integer"},
+          "available": {"type": "integer"}
+        }
+      },
+      "EquipmentCreate": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string"},
+          "category": {"type": "string"},
+          "condition": {"type": "string"},
+          "quantity": {"type": "integer"},
+          "available": {"type": "integer"}
+        }
+      },
+      "Request": {
+        "type": "object",
+        "properties": {
+          "_id": {"type": "string"},
+          "equipmentId": {"type": "string"},
+          "user": {"type": "string"},
+          "status": {"type": "string"}
+        }
+      },
+      "RequestCreate": {
+        "type": "object",
+        "properties": {
+          "equipmentId": {"type": "string"},
+          "user": {"type": "string"},
+          "status": {"type": "string"}
+        }
+      }
+    }
+  }
+}
