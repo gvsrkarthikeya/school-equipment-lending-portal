@@ -183,7 +183,19 @@ app.get('/api/equipment', async (req, res, next) => {
 app.post('/api/equipment', authenticate, authorize('admin'), validationRules.addEquipment, handleValidationErrors, async (req, res, next) => {
     try {
         const { name, category, condition, quantity, available } = req.body;
-        const eq = { name, category, condition, quantity, available: available !== undefined ? available : quantity, createdBy: req.user.username, createdAt: new Date(), updatedAt: new Date() };
+        const eq = { 
+            name, 
+            category, 
+            condition, 
+            quantity, 
+            available: available !== undefined ? available : quantity, 
+            borrowCount: 0,
+            returnCount: 0,
+            lastBorrowedAt: null,
+            createdBy: req.user.username, 
+            createdAt: new Date(), 
+            updatedAt: new Date() 
+        };
         const result = await equipmentsCollection.insertOne(eq);
         eq._id = result.insertedId;
         res.status(201).json({ success: true, data: eq });
@@ -262,18 +274,51 @@ app.put('/api/requests/:id', authenticate, authorize('staff','admin'), validatio
         const { id } = req.params; const { status } = req.body;
         const existing = await requestsCollection.findOne({ _id: new ObjectId(id) });
         if (!existing) return res.status(404).json({ success: false, message: 'Not found' });
-        let delta = 0; if (existing.status !== 'approved' && status === 'approved') delta = -1; else if (existing.status === 'approved' && status === 'returned') delta = +1;
-        if (delta !== 0) {
-            const equipmentObjectId = new ObjectId(existing.equipmentId);
-            if (delta < 0) {
-                const eqUpdate = await equipmentsCollection.updateOne({ _id: equipmentObjectId, available: { $gt: 0 } }, { $inc: { available: -1 }, $set: { updatedAt: new Date() } });
-                if (eqUpdate.modifiedCount === 0) return res.status(400).json({ success: false, message: 'No availability' });
-            } else {
-                await equipmentsCollection.updateOne({ _id: equipmentObjectId }, { $inc: { available: 1 }, $set: { updatedAt: new Date() } });
-            }
+        let delta = 0; 
+        const equipmentObjectId = new ObjectId(existing.equipmentId);
+        
+        if (existing.status !== 'approved' && status === 'approved') {
+            delta = -1;
+            // Increment borrowCount and update lastBorrowedAt
+            const eqUpdate = await equipmentsCollection.updateOne(
+                { _id: equipmentObjectId, available: { $gt: 0 } }, 
+                { 
+                    $inc: { available: -1, borrowCount: 1 }, 
+                    $set: { updatedAt: new Date(), lastBorrowedAt: new Date() } 
+                }
+            );
+            if (eqUpdate.modifiedCount === 0) return res.status(400).json({ success: false, message: 'No availability' });
+        } else if (existing.status === 'approved' && status === 'returned') {
+            delta = +1;
+            // Increment returnCount
+            await equipmentsCollection.updateOne(
+                { _id: equipmentObjectId }, 
+                { 
+                    $inc: { available: 1, returnCount: 1 }, 
+                    $set: { updatedAt: new Date() } 
+                }
+            );
         }
+        
         const result = await requestsCollection.updateOne({ _id: new ObjectId(id) }, { $set: { status, updatedAt: new Date(), updatedBy: req.user.username } });
         res.json({ success: true, modifiedCount: result.modifiedCount });
+    } catch (err) { next(err); }
+});
+
+// ANALYTICS - Usage statistics for equipment
+app.get('/api/analytics/equipment', authenticate, authorize('staff', 'admin'), async (req, res, next) => {
+    try {
+        const analytics = await equipmentsCollection.find({}).project({
+            name: 1,
+            category: 1,
+            borrowCount: 1,
+            returnCount: 1,
+            lastBorrowedAt: 1,
+            quantity: 1,
+            available: 1
+        }).sort({ borrowCount: -1 }).toArray();
+        
+        res.json({ success: true, count: analytics.length, data: analytics });
     } catch (err) { next(err); }
 });
 

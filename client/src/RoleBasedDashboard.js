@@ -7,6 +7,8 @@ const API_URL = 'http://localhost:3001/api';
 function RoleBasedDashboard() {
     const [equipment, setEquipment] = useState([]);
     const [requests, setRequests] = useState([]);
+    const [analytics, setAnalytics] = useState([]);
+    const [showAnalytics, setShowAnalytics] = useState(false);
     const [loading, setLoading] = useState(true);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [deleteItemId, setDeleteItemId] = useState(null);
@@ -179,6 +181,17 @@ function RoleBasedDashboard() {
             setRequests(requests.map(r => r._id === reqId ? { ...r, status: 'returned' } : r));
         } catch (err) {
             alert(`Failed to mark as returned: ${err.response?.data?.message || err.message}`);
+        }
+    };
+
+    // Fetch usage analytics
+    const fetchAnalytics = async () => {
+        try {
+            const res = await axios.get(`${API_URL}/analytics/equipment`);
+            setAnalytics(res.data.data || res.data);
+            setShowAnalytics(true);
+        } catch (err) {
+            alert(`Failed to load analytics: ${err.response?.data?.message || err.message}`);
         }
     };
 
@@ -448,6 +461,46 @@ function RoleBasedDashboard() {
             )}
             {(role === 'staff' || role === 'admin') && (
                 <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <h3>Usage Analytics</h3>
+                        <button onClick={fetchAnalytics} style={{ marginBottom: '10px' }}>
+                            {showAnalytics ? 'Refresh Analytics' : 'Show Analytics'}
+                        </button>
+                    </div>
+                    {showAnalytics && (
+                        <table className="equipment-table" style={{ marginBottom: '2em' }}>
+                            <thead>
+                                <tr>
+                                    <th>Equipment</th>
+                                    <th>Category</th>
+                                    <th>Total Quantity</th>
+                                    <th>Times Borrowed</th>
+                                    <th>Times Returned</th>
+                                    <th>Currently Out</th>
+                                    <th>Last Borrowed</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {analytics.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="7" style={{ textAlign: 'center' }}>No analytics data</td>
+                                    </tr>
+                                ) : (
+                                    analytics.map(eq => (
+                                        <tr key={eq._id}>
+                                            <td>{eq.name}</td>
+                                            <td>{eq.category}</td>
+                                            <td>{eq.quantity}</td>
+                                            <td>{eq.borrowCount || 0}</td>
+                                            <td>{eq.returnCount || 0}</td>
+                                            <td>{(eq.borrowCount || 0) - (eq.returnCount || 0)}</td>
+                                            <td>{eq.lastBorrowedAt ? new Date(eq.lastBorrowedAt).toLocaleDateString() : 'Never'}</td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    )}
                     <h3>Borrow Requests</h3>
                     <table className="requests-table">
                         <thead>
