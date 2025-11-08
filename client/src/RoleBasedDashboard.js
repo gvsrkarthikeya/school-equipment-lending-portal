@@ -45,8 +45,10 @@ function RoleBasedDashboard() {
             axios.get(`${API_URL}/requests`)
         ]).then(([equipRes, reqRes]) => {
             // Phase 2 API returns { success, data, count } format
-            setEquipment(equipRes.data.data || equipRes.data);
-            setRequests(reqRes.data.data || reqRes.data);
+            const equipmentData = equipRes.data.data || (Array.isArray(equipRes.data) ? equipRes.data : []);
+            const requestsData = reqRes.data.data || (Array.isArray(reqRes.data) ? reqRes.data : []);
+            setEquipment(equipmentData);
+            setRequests(requestsData);
             setLoading(false);
         }).catch(err => {
             console.error('Error loading data:', err);
@@ -148,8 +150,7 @@ function RoleBasedDashboard() {
     // Approve/Reject request (staff/admin)
     const handleApprove = async (reqId) => {
         try {
-            const res = await axios.put(`${API_URL}/requests/${reqId}`, { status: 'approved' });
-            const updatedRequest = res.data.data || res.data;
+            await axios.put(`${API_URL}/requests/${reqId}`, { status: 'approved' });
             setRequests(requests.map(r => r._id === reqId ? { ...r, status: 'approved' } : r));
             // Decrement available
             const req = requests.find(r => r._id === reqId);
@@ -165,8 +166,7 @@ function RoleBasedDashboard() {
     };
     const handleReject = async (reqId) => {
         try {
-            const res = await axios.put(`${API_URL}/requests/${reqId}`, { status: 'rejected' });
-            const updatedRequest = res.data.data || res.data;
+            await axios.put(`${API_URL}/requests/${reqId}`, { status: 'rejected' });
             setRequests(requests.map(r => r._id === reqId ? { ...r, status: 'rejected' } : r));
         } catch (err) {
             alert(`Failed to reject request: ${err.response?.data?.message || err.message}`);
@@ -176,8 +176,7 @@ function RoleBasedDashboard() {
     // Mark as returned (staff/admin)
     const handleReturn = async (reqId) => {
         try {
-            const res = await axios.put(`${API_URL}/requests/${reqId}`, { status: 'returned' });
-            const updatedRequest = res.data.data || res.data;
+            await axios.put(`${API_URL}/requests/${reqId}`, { status: 'returned' });
             const req = requests.find(r => r._id === reqId);
             setEquipment(equipment.map(eq => eq._id === req.equipmentId ? { ...eq, available: eq.available + 1 } : eq));
             setRequests(requests.map(r => r._id === reqId ? { ...r, status: 'returned' } : r));
@@ -190,7 +189,8 @@ function RoleBasedDashboard() {
     const fetchAnalytics = async () => {
         try {
             const res = await axios.get(`${API_URL}/analytics/equipment`);
-            setAnalytics(res.data.data || res.data);
+            const analyticsData = res.data.data || (Array.isArray(res.data) ? res.data : []);
+            setAnalytics(analyticsData);
             setShowAnalytics(true);
         } catch (err) {
             alert(`Failed to load analytics: ${err.response?.data?.message || err.message}`);
@@ -201,7 +201,8 @@ function RoleBasedDashboard() {
     const fetchStudentAnalytics = async () => {
         try {
             const res = await axios.get(`${API_URL}/analytics/students`);
-            setStudentAnalytics(res.data.data || res.data);
+            const studentData = res.data.data || (Array.isArray(res.data) ? res.data : []);
+            setStudentAnalytics(studentData);
             setShowStudentAnalytics(true);
         } catch (err) {
             alert(`Failed to load student analytics: ${err.response?.data?.message || err.message}`);
