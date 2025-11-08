@@ -349,7 +349,13 @@ app.get('/api/analytics/students', authenticate, authorize('staff', 'admin'), as
             {
                 $project: {
                     _id: 0,
-                    user: '$_id.user',
+                    user: {
+                        $cond: [
+                            { $or: [ { $eq: ['$_id.user', null] }, { $eq: ['$_id.user', ''] } ] },
+                            '(unknown)',
+                            '$_id.user'
+                        ]
+                    },
                     equipmentId: '$_id.equipmentId',
                     equipmentName: '$equipment.name',
                     category: '$equipment.category',
