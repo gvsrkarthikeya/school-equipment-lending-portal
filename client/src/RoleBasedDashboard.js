@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useLocation } from 'react-router-dom';
-const { useNavigate } = require('react-router-dom');
+import { useLocation, useNavigate } from 'react-router-dom';
 
 const API_URL = 'http://localhost:3001/api';
 
@@ -15,7 +14,7 @@ function RoleBasedDashboard() {
     // Get unique categories from equipment
     const categories = Array.from(new Set(equipment.map(eq => eq.category).filter(Boolean)));
     const location = useLocation();
-    const [role] = useState(location.state?.role || 'student');
+    const [role, setRole] = useState(location.state?.role || 'student');
     
     // Fetch current user info from /api/me
     useEffect(() => {
@@ -26,6 +25,7 @@ function RoleBasedDashboard() {
                     // Phase 2 API returns { success: true, user: { id, username, role } }
                     const userData = res.data.user || res.data;
                     setCurrentUser(userData.username);
+                    if (userData.role) setRole(userData.role);
                 })
                 .catch(err => {
                     console.error('Error fetching user info:', err);
