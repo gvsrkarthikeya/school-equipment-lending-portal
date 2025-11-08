@@ -9,6 +9,8 @@ function RoleBasedDashboard() {
     const [requests, setRequests] = useState([]);
     const [analytics, setAnalytics] = useState([]);
     const [showAnalytics, setShowAnalytics] = useState(false);
+    const [studentAnalytics, setStudentAnalytics] = useState([]);
+    const [showStudentAnalytics, setShowStudentAnalytics] = useState(false);
     const [loading, setLoading] = useState(true);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [deleteItemId, setDeleteItemId] = useState(null);
@@ -192,6 +194,17 @@ function RoleBasedDashboard() {
             setShowAnalytics(true);
         } catch (err) {
             alert(`Failed to load analytics: ${err.response?.data?.message || err.message}`);
+        }
+    };
+
+    // Fetch student analytics
+    const fetchStudentAnalytics = async () => {
+        try {
+            const res = await axios.get(`${API_URL}/analytics/students`);
+            setStudentAnalytics(res.data.data || res.data);
+            setShowStudentAnalytics(true);
+        } catch (err) {
+            alert(`Failed to load student analytics: ${err.response?.data?.message || err.message}`);
         }
     };
 
@@ -461,10 +474,13 @@ function RoleBasedDashboard() {
             )}
             {(role === 'staff' || role === 'admin') && (
                 <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
                         <h3>Usage Analytics</h3>
                         <button onClick={fetchAnalytics} style={{ marginBottom: '10px' }}>
                             {showAnalytics ? 'Refresh Analytics' : 'Show Analytics'}
+                        </button>
+                        <button onClick={fetchStudentAnalytics} style={{ marginBottom: '10px' }}>
+                            {showStudentAnalytics ? 'Refresh Student Analytics' : 'Show Student Analytics'}
                         </button>
                     </div>
                     {showAnalytics && (
@@ -495,6 +511,36 @@ function RoleBasedDashboard() {
                                             <td>{eq.returnCount || 0}</td>
                                             <td>{(eq.borrowCount || 0) - (eq.returnCount || 0)}</td>
                                             <td>{eq.lastBorrowedAt ? new Date(eq.lastBorrowedAt).toLocaleDateString() : 'Never'}</td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    )}
+                    {showStudentAnalytics && (
+                        <table className="equipment-table" style={{ marginBottom: '2em' }}>
+                            <thead>
+                                <tr>
+                                    <th>Student</th>
+                                    <th>Equipment</th>
+                                    <th>Category</th>
+                                    <th>Times Borrowed</th>
+                                    <th>Currently Borrowed</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {studentAnalytics.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="5" style={{ textAlign: 'center' }}>No student analytics data</td>
+                                    </tr>
+                                ) : (
+                                    studentAnalytics.map(row => (
+                                        <tr key={`${row.user}-${row.equipmentId}`}>
+                                            <td>{row.user}</td>
+                                            <td>{row.equipmentName}</td>
+                                            <td>{row.category}</td>
+                                            <td>{row.timesBorrowed}</td>
+                                            <td>{row.currentlyBorrowed}</td>
                                         </tr>
                                     ))
                                 )}

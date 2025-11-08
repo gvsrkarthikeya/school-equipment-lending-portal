@@ -322,6 +322,58 @@ app.get('/api/analytics/equipment', authenticate, authorize('staff', 'admin'), a
     } catch (err) { next(err); }
 });
 
+// Student analytics: which student borrowed which item and how many times
+app.get('/api/analytics/students', authenticate, authorize('staff', 'admin'), async (req, res, next) => {
+    try {
+        const pipeline = [
+            // Count borrow events as requests that are currently approved or have been returned
+            { $match: { status: { $in: ['approved', 'returned'] } } },
+            {
+                $group: {
+                    _id: { user: '$user', equipmentId: '$equipmentId' },
+                    timesBorrowed: { $sum: 1 },
+                    currentlyBorrowed: { $sum: { $cond: [ { $eq: ['$status', 'approved'] }, 1, 0 ] } }
+                }
+            },
+            // Convert equipmentId (stored as string) to ObjectId for lookup
+            { $addFields: { eqIdObj: { $toObjectId: '$_id.equipmentId' } } },
+            {
+                $lookup: {
+                    from: 'equipments',
+                    localField: 'eqIdObj',
+                    foreignField: '_id',
+                    as: 'equipment'
+                }
+            },
+            { $unwind: '$equipment' },
+            {
+                $project: {
+                    _id: 0,
+                    user: '$_id.user',
+                    equipmentId: '$_id.equipmentId',
+                    equipmentName: '$equipment.name',
+                    category: '$equipment.category',
+                    timesBorrowed: 1,
+                    currentlyBorrowed: 1
+                }
+            },
+            { $sort: { timesBorrowed: -1, user: 1 } }
+        ];
+
+        const rows = await requestsCollection.aggregate(pipeline).toArray();
+
+        // Also compute per-user totals
+        const perUser = {};
+        for (const r of rows) {
+            if (!perUser[r.user]) perUser[r.user] = { totalBorrowed: 0, activeBorrowed: 0 };
+            perUser[r.user].totalBorrowed += r.timesBorrowed;
+            perUser[r.user].activeBorrowed += r.currentlyBorrowed;
+        }
+
+        res.json({ success: true, count: rows.length, data: rows, summary: perUser });
+    } catch (err) { next(err); }
+});
+
 // 404
 app.use((req, res) => res.status(404).json({ success: false, message: 'Route not found' }));
 
