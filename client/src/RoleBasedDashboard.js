@@ -1,6 +1,18 @@
 import React, { useState, useEffect } from 'react';
+import { Bar } from 'react-chartjs-2';
+import {
+    Chart as ChartJS,
+    CategoryScale,
+    LinearScale,
+    BarElement,
+    Title,
+    Tooltip,
+    Legend
+} from 'chart.js';
 import axios from 'axios';
 import { useLocation, useNavigate } from 'react-router-dom';
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 const API_URL = 'http://localhost:3001/api';
 
@@ -19,7 +31,7 @@ function RoleBasedDashboard() {
     const categories = Array.from(new Set(equipment.map(eq => eq.category).filter(Boolean)));
     const location = useLocation();
     const [role, setRole] = useState(location.state?.role || 'student');
-    
+
     // Fetch current user info from /api/me
     useEffect(() => {
         const token = localStorage.getItem('token');
@@ -36,7 +48,7 @@ function RoleBasedDashboard() {
                 });
         }
     }, []);
-    
+
     // Fetch equipment and requests on mount
     useEffect(() => {
         setLoading(true);
@@ -189,6 +201,7 @@ function RoleBasedDashboard() {
     const fetchAnalytics = async () => {
         try {
             const res = await axios.get(`${API_URL}/analytics/equipment`);
+            console.log(res)
             const analyticsData = res.data.data || (Array.isArray(res.data) ? res.data : []);
             setAnalytics(analyticsData);
             setShowAnalytics(true);
@@ -220,16 +233,16 @@ function RoleBasedDashboard() {
     // Loading Skeleton Component
     const LoadingSkeleton = () => (
         <div style={{ padding: '20px' }}>
-            <div style={{ 
-                height: '40px', 
+            <div style={{
+                height: '40px',
                 background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)',
                 backgroundSize: '200% 100%',
                 animation: 'loading 1.5s infinite',
                 borderRadius: '4px',
                 marginBottom: '20px'
             }}></div>
-            <div style={{ 
-                height: '200px', 
+            <div style={{
+                height: '200px',
                 background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)',
                 backgroundSize: '200% 100%',
                 animation: 'loading 1.5s infinite',
@@ -250,7 +263,7 @@ function RoleBasedDashboard() {
     // Confirmation Modal Component
     const ConfirmationModal = ({ show, onClose, onConfirm, itemName }) => {
         if (!show) return null;
-        
+
         return (
             <div style={{
                 position: 'fixed',
@@ -277,7 +290,7 @@ function RoleBasedDashboard() {
                         Are you sure you want to delete "{itemName}"? This action cannot be undone.
                     </p>
                     <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                        <button 
+                        <button
                             onClick={onClose}
                             style={{
                                 padding: '10px 20px',
@@ -290,7 +303,7 @@ function RoleBasedDashboard() {
                         >
                             Cancel
                         </button>
-                        <button 
+                        <button
                             onClick={onConfirm}
                             style={{
                                 padding: '10px 20px',
@@ -337,6 +350,7 @@ function RoleBasedDashboard() {
                 </select>
                 {role === 'admin' && <button onClick={() => setShowForm(!showForm)}>Add Equipment</button>}
             </div>
+
             {showForm && role === 'admin' && (
                 <form onSubmit={handleAdd}>
                     <input placeholder="Name" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required />
@@ -427,15 +441,15 @@ function RoleBasedDashboard() {
                     )}
                 </tbody>
             </table>
-            
+
             {/* Delete Confirmation Modal */}
-            <ConfirmationModal 
+            <ConfirmationModal
                 show={showDeleteModal}
                 onClose={closeDeleteModal}
                 onConfirm={handleDelete}
                 itemName={equipment.find(eq => eq._id === deleteItemId)?.name || 'this item'}
             />
-            
+
             <hr />
             {/* Show assigned items for student */}
             {role === 'student' && (
@@ -478,75 +492,166 @@ function RoleBasedDashboard() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
                         <h3>Usage Analytics</h3>
                         <button onClick={fetchAnalytics} style={{ marginBottom: '10px' }}>
-                            {showAnalytics ? 'Refresh Analytics' : 'Show Analytics'}
+                            {showAnalytics ? 'Refresh Equipment Analytics' : 'Show Equipment Analytics'}
                         </button>
                         <button onClick={fetchStudentAnalytics} style={{ marginBottom: '10px' }}>
                             {showStudentAnalytics ? 'Refresh Student Analytics' : 'Show Student Analytics'}
                         </button>
                     </div>
-                    {showAnalytics && (
-                        <table className="equipment-table" style={{ marginBottom: '2em' }}>
-                            <thead>
-                                <tr>
-                                    <th>Equipment</th>
-                                    <th>Category</th>
-                                    <th>Total Quantity</th>
-                                    <th>Times Borrowed</th>
-                                    <th>Times Returned</th>
-                                    <th>Currently Out</th>
-                                    <th>Last Borrowed</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {analytics.length === 0 ? (
-                                    <tr>
-                                        <td colSpan="7" style={{ textAlign: 'center' }}>No analytics data</td>
-                                    </tr>
-                                ) : (
-                                    analytics.map(eq => (
-                                        <tr key={eq._id}>
-                                            <td>{eq.name}</td>
-                                            <td>{eq.category}</td>
-                                            <td>{eq.quantity}</td>
-                                            <td>{eq.borrowCount || 0}</td>
-                                            <td>{eq.returnCount || 0}</td>
-                                            <td>{(eq.borrowCount || 0) - (eq.returnCount || 0)}</td>
-                                            <td>{eq.lastBorrowedAt ? new Date(eq.lastBorrowedAt).toLocaleDateString() : 'Never'}</td>
-                                        </tr>
-                                    ))
+                    {(role === 'staff' || role === 'admin') && (showAnalytics || showStudentAnalytics) && (
+                        <div style={{ display: 'flex', flexDirection: 'row', gap: '2em', margin: '2em 0', justifyContent: 'center', alignItems: 'flex-start' }}>
+                            {/* Equipment Analytics Table and Chart */}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                {showAnalytics && (
+                                    <>
+                                        <div style={{ background: '#fff', borderRadius: 8, padding: 16, boxShadow: '0 2px 8px #eee', marginBottom: 24 }}>
+                                            <h4 style={{ margin: '0 0 1em 0', textAlign: 'center' }}>Equipment Analytics</h4>
+                                            <table className="equipment-table" style={{ marginBottom: '2em' }}>
+                                                <thead>
+                                                    <tr>
+                                                        <th>Equipment</th>
+                                                        <th>Category</th>
+                                                        <th>Total Quantity</th>
+                                                        <th>Times Borrowed</th>
+                                                        <th>Times Returned</th>
+                                                        <th>Currently Out</th>
+                                                        <th>Last Borrowed</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {analytics.length === 0 ? (
+                                                        <tr>
+                                                            <td colSpan="7" style={{ textAlign: 'center' }}>No analytics data</td>
+                                                        </tr>
+                                                    ) : (
+                                                        analytics.map(eq => (
+                                                            <tr key={eq._id}>
+                                                                <td>{eq.name}</td>
+                                                                <td>{eq.category}</td>
+                                                                <td>{eq.quantity}</td>
+                                                                <td>{eq.borrowCount || 0}</td>
+                                                                <td>{eq.returnCount || 0}</td>
+                                                                <td>{(eq.borrowCount || 0) - (eq.returnCount || 0)}</td>
+                                                                <td>{eq.lastBorrowedAt ? new Date(eq.lastBorrowedAt).toLocaleDateString() : 'Never'}</td>
+                                                            </tr>
+                                                        ))
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        {analytics.length > 0 && (
+                                            <div style={{ background: '#fff', borderRadius: 8, padding: 16, boxShadow: '0 2px 8px #eee' }}>
+                                                <h4 style={{ margin: '0 0 1em 0', textAlign: 'center' }}>Equipment Usage (Bar Chart)</h4>
+                                                <Bar
+                                                    data={{
+                                                        labels: analytics.map(eq => eq.name),
+                                                        datasets: [
+                                                            {
+                                                                label: 'Times Borrowed',
+                                                                data: analytics.map(eq => eq.borrowCount || 0),
+                                                                backgroundColor: 'rgba(54, 162, 235, 0.7)'
+                                                            },
+                                                            {
+                                                                label: 'Times Returned',
+                                                                data: analytics.map(eq => eq.returnCount || 0),
+                                                                backgroundColor: 'rgba(75, 192, 192, 0.7)'
+                                                            },
+                                                            {
+                                                                label: 'Currently Out',
+                                                                data: analytics.map(eq => (eq.borrowCount || 0) - (eq.returnCount || 0)),
+                                                                backgroundColor: 'rgba(255, 99, 132, 0.7)'
+                                                            }
+                                                        ]
+                                                    }}
+                                                    options={{
+                                                        responsive: true,
+                                                        plugins: {
+                                                            legend: { position: 'top' },
+                                                            title: { display: false }
+                                                        },
+                                                        scales: {
+                                                            x: { stacked: true },
+                                                            y: { stacked: true, beginAtZero: true }
+                                                        }
+                                                    }}
+                                                />
+                                            </div>
+                                        )}
+                                    </>
                                 )}
-                            </tbody>
-                        </table>
-                    )}
-                    {showStudentAnalytics && (
-                        <table className="equipment-table" style={{ marginBottom: '2em' }}>
-                            <thead>
-                                <tr>
-                                    <th>Student</th>
-                                    <th>Equipment</th>
-                                    <th>Category</th>
-                                    <th>Times Borrowed</th>
-                                    <th>Currently Borrowed</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {studentAnalytics.length === 0 ? (
-                                    <tr>
-                                        <td colSpan="5" style={{ textAlign: 'center' }}>No student analytics data</td>
-                                    </tr>
-                                ) : (
-                                    studentAnalytics.map(row => (
-                                        <tr key={`${row.user}-${row.equipmentId}`}>
-                                            <td>{row.user || '(unknown)'}</td>
-                                            <td>{row.equipmentName}</td>
-                                            <td>{row.category}</td>
-                                            <td>{row.timesBorrowed}</td>
-                                            <td>{row.currentlyBorrowed}</td>
-                                        </tr>
-                                    ))
+                            </div>
+                            {/* Student Analytics Table and Chart */}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                {showStudentAnalytics && (
+                                    <>
+                                        <div style={{ background: '#fff', borderRadius: 8, padding: 16, boxShadow: '0 2px 8px #eee', marginBottom: 24 }}>
+                                            <h4 style={{ margin: '0 0 1em 0', textAlign: 'center' }}>Student Analytics</h4>
+                                            <table className="equipment-table" style={{ marginBottom: '2em' }}>
+                                                <thead>
+                                                    <tr>
+                                                        <th>Student</th>
+                                                        <th>Equipment</th>
+                                                        <th>Category</th>
+                                                        <th>Times Borrowed</th>
+                                                        <th>Currently Borrowed</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {studentAnalytics.length === 0 ? (
+                                                        <tr>
+                                                            <td colSpan="5" style={{ textAlign: 'center' }}>No student analytics data</td>
+                                                        </tr>
+                                                    ) : (
+                                                        studentAnalytics.map(row => (
+                                                            <tr key={`${row.user}-${row.equipmentId}`}>
+                                                                <td>{row.user || '(unknown)'}</td>
+                                                                <td>{row.equipmentName}</td>
+                                                                <td>{row.category}</td>
+                                                                <td>{row.timesBorrowed}</td>
+                                                                <td>{row.currentlyBorrowed}</td>
+                                                            </tr>
+                                                        ))
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        {studentAnalytics.length > 0 && (
+                                            <div style={{ background: '#fff', borderRadius: 8, padding: 16, boxShadow: '0 2px 8px #eee' }}>
+                                                <h4 style={{ margin: '0 0 1em 0', textAlign: 'center' }}>Student Borrowing (Bar Chart)</h4>
+                                                <Bar
+                                                    data={{
+                                                        labels: studentAnalytics.map(row => row.user || '(unknown)'),
+                                                        datasets: [
+                                                            {
+                                                                label: 'Times Borrowed',
+                                                                data: studentAnalytics.map(row => row.timesBorrowed),
+                                                                backgroundColor: 'rgba(153, 102, 255, 0.7)'
+                                                            },
+                                                            {
+                                                                label: 'Currently Borrowed',
+                                                                data: studentAnalytics.map(row => row.currentlyBorrowed),
+                                                                backgroundColor: 'rgba(255, 206, 86, 0.7)'
+                                                            }
+                                                        ]
+                                                    }}
+                                                    options={{
+                                                        responsive: true,
+                                                        plugins: {
+                                                            legend: { position: 'top' },
+                                                            title: { display: false }
+                                                        },
+                                                        scales: {
+                                                            x: { stacked: false },
+                                                            y: { beginAtZero: true }
+                                                        }
+                                                    }}
+                                                />
+                                            </div>
+                                        )}
+                                    </>
                                 )}
-                            </tbody>
-                        </table>
+                            </div>
+                        </div>
                     )}
                     <h3>Borrow Requests</h3>
                     <table className="requests-table">
