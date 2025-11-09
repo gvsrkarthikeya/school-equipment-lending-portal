@@ -63,18 +63,6 @@ npm start        # React dev server (API base: see REACT_APP_API_URL)
 
 ---
 
-## 🛠️ Next Planned Items
-
-Pending (see internal TODO):
-- Automated tests
-- Environment variable for client API base (`REACT_APP_API_URL`)
-- AI usage log
-- Reflection report
-- Demo script
-- Version tagging
-
----
-
 ## 🔄 Phase Comparison
 
 | Aspect     | Phase 1         | Phase 2                                         |
